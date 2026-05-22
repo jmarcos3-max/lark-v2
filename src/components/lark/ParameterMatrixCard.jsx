@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { Sliders, Zap, Loader2, Save } from 'lucide-react';
+import { Sliders, Zap, Loader2, Save, Plus, FolderOpen } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+
+const MOCK_PROJECTS = [
+  { id: 1, title: 'Rainy Evening Session', instrument: 'Piano', mood: 'Melancholic' },
+  { id: 2, title: 'Late Night Bass Groove', instrument: 'Bass', mood: 'Calm' },
+  { id: 3, title: 'Morning Drum Loop', instrument: 'Drums', mood: 'Energetic' },
+  { id: 4, title: 'Electric Soul', instrument: 'Guitar', mood: 'Rock' },
+];
 
 const INSTRUMENTS = [
   { value: 'Piano', icon: '🎹' },
@@ -22,6 +29,7 @@ export default function ParameterMatrixCard({
   onInstrumentChange,
   onMoodChange,
   onAutomate,
+  onNewProject,
   isProcessing,
   hasAudio,
   currentProject,
@@ -29,6 +37,7 @@ export default function ParameterMatrixCard({
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
 
   const handleSave = async () => {
     if (!currentProject.title && !instrument && !mood) return;
@@ -121,6 +130,68 @@ export default function ParameterMatrixCard({
       </div>
 
       <div className="flex-1" />
+
+      {/* Project Actions Row */}
+      <div className="flex gap-2 mb-2 relative">
+        <button
+          onClick={onNewProject}
+          className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
+          style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'var(--lark-text-muted)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; e.currentTarget.style.color = 'var(--lark-violet-bright)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--lark-text-muted)'; }}
+        >
+          <Plus size={12} />
+          New Project
+        </button>
+        <button
+          onClick={() => setShowProjects(v => !v)}
+          className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
+          style={{
+            background: showProjects ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
+            border: showProjects ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.08)',
+            color: showProjects ? 'var(--lark-violet-bright)' : 'var(--lark-text-muted)',
+          }}
+        >
+          <FolderOpen size={12} />
+          Open Project
+        </button>
+
+        {/* Project Popover */}
+        {showProjects && (
+          <div
+            className="absolute bottom-full mb-2 left-0 right-0 rounded-xl overflow-hidden z-20"
+            style={{ background: '#18181b', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+          >
+            <div className="px-3 py-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+              <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>Cloud Projects</span>
+            </div>
+            {MOCK_PROJECTS.map(p => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  onInstrumentChange(p.instrument);
+                  onMoodChange(p.mood);
+                  setShowProjects(false);
+                }}
+                className="w-full px-3 py-2.5 flex items-center justify-between text-left transition-all duration-150"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div>
+                  <p className="text-xs font-medium" style={{ color: 'var(--lark-text)' }}>{p.title}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--lark-text-muted)' }}>{p.instrument} · {p.mood}</p>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--lark-violet-bright)' }}>Load</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Save Button */}
       <button

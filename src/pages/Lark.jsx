@@ -28,6 +28,11 @@ export default function Lark() {
     setCurrentProject(p => ({ ...p, selected_mood: mood }));
   };
 
+  const handleNewProject = () => {
+    setCurrentProject({ title: 'Untitled Track', source_audio_url: null, target_instrument: null, selected_mood: null });
+    setOutputUrl(null);
+  };
+
   const handleAutomate = async () => {
     setIsProcessing(true);
     // Simulate processing delay
@@ -60,6 +65,7 @@ export default function Lark() {
               onInstrumentChange={handleInstrumentChange}
               onMoodChange={handleMoodChange}
               onAutomate={handleAutomate}
+              onNewProject={handleNewProject}
               isProcessing={isProcessing}
               hasAudio={!!currentProject.source_audio_url}
               currentProject={currentProject}

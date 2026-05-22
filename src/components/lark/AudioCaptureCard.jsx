@@ -1,6 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Mic, MicOff, Upload, FileAudio, CheckCircle, X } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Mic, MicOff, Upload, FileAudio, CheckCircle, X, Play, Pause, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+
+// Generates fake waveform data for visual display
+const generateWaveform = (seed = 42, points = 80) => {
+  const arr = [];
+  let val = 0.5;
+  for (let i = 0; i < points; i++) {
+    val += (Math.sin(i * 0.4 + seed) * 0.15 + (Math.random() - 0.5) * 0.25);
+    val = Math.max(0.08, Math.min(1, val));
+    arr.push(val);
+  }
+  return arr;
+};
 
 const WaveformBars = () => (
   <div className="flex items-center justify-center gap-0.5 h-8">
@@ -20,18 +32,193 @@ const WaveformBars = () => (
   </div>
 );
 
+function WaveformTrimmer({ audioUrl, onReset }) {
+  const [waveform] = useState(() => generateWaveform(Date.now() % 100));
+  const [leftTrim, setLeftTrim] = useState(0.05);
+  const [rightTrim, setRightTrim] = useState(0.92);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [dragging, setDragging] = useState(null); // 'left' | 'right'
+  const containerRef = useRef(null);
+  const audioRef = useRef(null);
+  const TOTAL_DURATION = 8.0;
+
+  const trimStart = (leftTrim * TOTAL_DURATION).toFixed(1);
+  const trimEnd = (rightTrim * TOTAL_DURATION).toFixed(1);
+
+  const handleMouseDown = (handle) => (e) => {
+    e.preventDefault();
+    setDragging(handle);
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      if (dragging === 'left') setLeftTrim(Math.min(ratio, rightTrim - 0.08));
+      if (dragging === 'right') setRightTrim(Math.max(ratio, leftTrim + 0.08));
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove);
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [dragging, leftTrim, rightTrim]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.currentTime = leftTrim * TOTAL_DURATION;
+      audioRef.current.play();
+      setIsPlaying(true);
+      const endTime = rightTrim * TOTAL_DURATION;
+      const check = setInterval(() => {
+        if (audioRef.current && audioRef.current.currentTime >= endTime) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+          clearInterval(check);
+        }
+      }, 100);
+    }
+  };
+
+  return (
+    <div className="flex flex-col flex-1 gap-3">
+      <audio ref={audioRef} src={audioUrl} />
+
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
+          Edit Recording
+        </span>
+        <button
+          onClick={onReset}
+          className="flex items-center gap-1 text-[10px] font-medium transition-colors"
+          style={{ color: 'var(--lark-text-subtle)' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#F87171'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--lark-text-subtle)'}
+        >
+          <RotateCcw size={10} />
+          Re-record
+        </button>
+      </div>
+
+      {/* Waveform + trim handles */}
+      <div
+        ref={containerRef}
+        className="relative rounded-lg overflow-hidden select-none"
+        style={{ height: '72px', background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}
+      >
+        {/* Dimmed regions outside trim */}
+        <div
+          className="absolute top-0 bottom-0 left-0 z-10 pointer-events-none"
+          style={{ width: `${leftTrim * 100}%`, background: 'rgba(8,8,8,0.6)' }}
+        />
+        <div
+          className="absolute top-0 bottom-0 right-0 z-10 pointer-events-none"
+          style={{ width: `${(1 - rightTrim) * 100}%`, background: 'rgba(8,8,8,0.6)' }}
+        />
+
+        {/* Waveform bars */}
+        <div className="absolute inset-0 flex items-center px-1 gap-px">
+          {waveform.map((h, i) => {
+            const pos = i / waveform.length;
+            const active = pos >= leftTrim && pos <= rightTrim;
+            return (
+              <div
+                key={i}
+                className="flex-1 rounded-sm"
+                style={{
+                  height: `${h * 80}%`,
+                  background: active
+                    ? `linear-gradient(to top, #7C3AED, #A78BFA)`
+                    : 'rgba(139,92,246,0.2)',
+                  transition: 'background 0.1s',
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Left Handle */}
+        <div
+          className="absolute top-0 bottom-0 z-20 flex items-center justify-center cursor-ew-resize"
+          style={{ left: `${leftTrim * 100}%`, width: '14px', transform: 'translateX(-7px)' }}
+          onMouseDown={handleMouseDown('left')}
+          onTouchStart={handleMouseDown('left')}
+        >
+          <div className="w-0.5 h-full rounded-full" style={{ background: '#A78BFA', boxShadow: '0 0 6px #A78BFA' }} />
+          <div className="absolute w-3 h-5 rounded flex items-center justify-center" style={{ background: '#7C3AED', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}>
+            <div className="flex flex-col gap-0.5">{[0,1,2].map(i => <div key={i} className="w-0.5 h-0.5 rounded-full bg-white opacity-60" />)}</div>
+          </div>
+        </div>
+
+        {/* Right Handle */}
+        <div
+          className="absolute top-0 bottom-0 z-20 flex items-center justify-center cursor-ew-resize"
+          style={{ left: `${rightTrim * 100}%`, width: '14px', transform: 'translateX(-7px)' }}
+          onMouseDown={handleMouseDown('right')}
+          onTouchStart={handleMouseDown('right')}
+        >
+          <div className="w-0.5 h-full rounded-full" style={{ background: '#A78BFA', boxShadow: '0 0 6px #A78BFA' }} />
+          <div className="absolute w-3 h-5 rounded flex items-center justify-center" style={{ background: '#7C3AED', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}>
+            <div className="flex flex-col gap-0.5">{[0,1,2].map(i => <div key={i} className="w-0.5 h-0.5 rounded-full bg-white opacity-60" />)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Playback controls */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={togglePlay}
+          className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200"
+          style={{
+            background: isPlaying ? 'rgba(139,92,246,0.3)' : 'rgba(139,92,246,0.15)',
+            border: '1px solid rgba(139,92,246,0.4)',
+            color: 'var(--lark-violet-bright)',
+          }}
+        >
+          {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+        </button>
+        <span className="text-[11px] font-mono" style={{ color: 'var(--lark-text-muted)' }}>
+          Trimmed: {trimStart}s – {trimEnd}s
+        </span>
+        <span className="text-[11px] font-mono ml-auto" style={{ color: 'var(--lark-text-subtle)' }}>
+          {(parseFloat(trimEnd) - parseFloat(trimStart)).toFixed(1)}s
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function AudioCaptureCard({ onAudioReady }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState(null);
+  const [capturedAudioUrl, setCapturedAudioUrl] = useState(null);
+  const [capturedFileName, setCapturedFileName] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [micError, setMicError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const [micError, setMicError] = useState(null);
+  const handleReset = () => {
+    setCapturedAudioUrl(null);
+    setCapturedFileName(null);
+    onAudioReady(null);
+  };
 
   const startRecording = async () => {
     setMicError(null);
@@ -51,7 +238,8 @@ export default function AudioCaptureCard({ onAudioReady }) {
       setIsUploading(true);
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setIsUploading(false);
-      setUploadedFile({ name: 'Voice Recording', url: file_url });
+      setCapturedAudioUrl(file_url);
+      setCapturedFileName('Voice Recording');
       onAudioReady(file_url);
       stream.getTracks().forEach(t => t.stop());
     };
@@ -75,7 +263,8 @@ export default function AudioCaptureCard({ onAudioReady }) {
     setIsUploading(true);
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
     setIsUploading(false);
-    setUploadedFile({ name: file.name, url: file_url });
+    setCapturedAudioUrl(file_url);
+    setCapturedFileName(file.name);
     onAudioReady(file_url);
   }, [onAudioReady]);
 
@@ -86,22 +275,31 @@ export default function AudioCaptureCard({ onAudioReady }) {
     if (file) handleFile(file);
   };
 
-  const clearFile = () => {
-    setUploadedFile(null);
-    onAudioReady(null);
-  };
+  // === REVIEW STATE ===
+  if (capturedAudioUrl) {
+    return (
+      <div className="lark-card-glass rounded-2xl p-5 h-full flex flex-col" style={{ minHeight: '340px' }}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }} />
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
+            Audio Capture
+          </span>
+          <div className="ml-auto flex items-center gap-1.5 text-[10px]" style={{ color: '#86efac' }}>
+            <CheckCircle size={11} style={{ color: '#4ade80' }} />
+            {capturedFileName}
+          </div>
+        </div>
+        <WaveformTrimmer audioUrl={capturedAudioUrl} onReset={handleReset} />
+      </div>
+    );
+  }
 
+  // === INITIAL / RECORDING STATE ===
   return (
-    <div
-      className="lark-card-glass rounded-2xl p-5 h-full flex flex-col"
-      style={{ minHeight: '340px' }}
-    >
+    <div className="lark-card-glass rounded-2xl p-5 h-full flex flex-col" style={{ minHeight: '340px' }}>
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
-        <div
-          className="w-1.5 h-5 rounded-full"
-          style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }}
-        />
+        <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }} />
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
           Audio Capture
         </span>
@@ -168,52 +366,33 @@ export default function AudioCaptureCard({ onAudioReady }) {
       </div>
 
       {/* Drop Zone */}
-      {uploadedFile ? (
-        <div
-          className="flex items-center gap-3 p-3 rounded-xl"
-          style={{
-            background: 'rgba(139,92,246,0.08)',
-            border: '1px solid rgba(139,92,246,0.25)',
-          }}
-        >
-          <CheckCircle size={16} style={{ color: '#A78BFA' }} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate" style={{ color: 'var(--lark-text)' }}>{uploadedFile.name}</p>
-            <p className="text-[10px]" style={{ color: 'var(--lark-text-muted)' }}>Ready for processing</p>
-          </div>
-          <button onClick={clearFile}>
-            <X size={14} style={{ color: 'var(--lark-text-muted)' }} />
-          </button>
-        </div>
-      ) : (
-        <div
-          className="relative rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer transition-all duration-200"
-          style={{
-            border: `1.5px dashed ${isDragging ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.1)'}`,
-            background: isDragging ? 'rgba(139,92,246,0.06)' : 'transparent',
-          }}
-          onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*,.wav,.mp3,.webm,.ogg"
-            className="hidden"
-            onChange={e => e.target.files[0] && handleFile(e.target.files[0])}
-          />
-          {isUploading ? (
-            <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <FileAudio size={20} style={{ color: isDragging ? 'var(--lark-violet-bright)' : 'var(--lark-text-muted)' }} />
-          )}
-          <p className="text-xs text-center" style={{ color: 'var(--lark-text-muted)' }}>
-            {isUploading ? 'Uploading...' : 'Drop .wav or .mp3 file here'}
-          </p>
-        </div>
-      )}
+      <div
+        className="relative rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer transition-all duration-200"
+        style={{
+          border: `1.5px dashed ${isDragging ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.1)'}`,
+          background: isDragging ? 'rgba(139,92,246,0.06)' : 'transparent',
+        }}
+        onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*,.wav,.mp3,.webm,.ogg"
+          className="hidden"
+          onChange={e => e.target.files[0] && handleFile(e.target.files[0])}
+        />
+        {isUploading ? (
+          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <FileAudio size={20} style={{ color: isDragging ? 'var(--lark-violet-bright)' : 'var(--lark-text-muted)' }} />
+        )}
+        <p className="text-xs text-center" style={{ color: 'var(--lark-text-muted)' }}>
+          {isUploading ? 'Uploading...' : 'Drop .wav or .mp3 file here'}
+        </p>
+      </div>
     </div>
   );
 }

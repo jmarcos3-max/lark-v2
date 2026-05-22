@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { Bird, LogOut, User, Sparkles } from 'lucide-react';
+import { Bird, LogOut, User, Sparkles, RefreshCw } from 'lucide-react';
 
-export default function LarkNavbar() {
+export default function LarkNavbar({ isConnected = true }) {
   const { user, logout } = useAuth();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = () => {
+    setIsSyncing(true);
+    setTimeout(() => setIsSyncing(false), 1200);
+  };
 
   return (
     <header
@@ -59,6 +65,26 @@ export default function LarkNavbar() {
       <div className="flex items-center gap-3">
         {user ? (
           <div className="flex items-center gap-3">
+            {/* Connection Status */}
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400' : 'bg-gray-500'}`} style={isConnected ? { boxShadow: '0 0 6px #4ade80' } : {}} />
+              <span className="text-[10px] font-medium" style={{ color: isConnected ? '#86efac' : 'var(--lark-text-muted)' }}>
+                {isConnected ? 'Connected via Nexus' : 'Offline Sandbox Mode'}
+              </span>
+            </div>
+
+            {/* Sync button */}
+            <button
+              onClick={handleSync}
+              title="Sync to cloud"
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'var(--lark-text-muted)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--lark-violet-bright)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--lark-text-muted)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+            >
+              <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
+            </button>
+
             <div className="flex items-center gap-2">
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold"
