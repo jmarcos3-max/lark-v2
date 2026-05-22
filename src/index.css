@@ -27,7 +27,7 @@
     --ring: 270 80% 65%;
     --radius: 0.75rem;
 
-    /* Custom Lark tokens */
+    /* Custom Lark tokens — Night (default) */
     --lark-bg: #080808;
     --lark-card: #111113;
     --lark-card-hover: #161619;
@@ -40,6 +40,46 @@
     --lark-text: #F0EEF6;
     --lark-text-muted: #6B6880;
     --lark-text-subtle: #3D3B4A;
+    --lark-header-bg: rgba(8,8,8,0.85);
+    --lark-header-border: rgba(255,255,255,0.06);
+    --lark-card-glass-bg: rgba(17,17,19,0.85);
+  }
+
+  [data-theme="day"] {
+    --background: 0 0% 96%;
+    --foreground: 0 0% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 11%;
+    --primary: 263 69% 50%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 263 69% 50%;
+    --accent-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 92%;
+    --ring: 263 69% 50%;
+
+    /* Lark Day tokens */
+    --lark-bg: #f4f4f5;
+    --lark-card: #ffffff;
+    --lark-card-hover: #f9f9fa;
+    --lark-border: rgba(0,0,0,0.08);
+    --lark-border-hover: rgba(0,0,0,0.16);
+    --lark-violet: #6d28d9;
+    --lark-violet-bright: #6d28d9;
+    --lark-violet-glow: rgba(109,40,217,0.18);
+    --lark-violet-dim: rgba(109,40,217,0.09);
+    --lark-text: #18181b;
+    --lark-text-muted: #52525b;
+    --lark-text-subtle: #a1a1aa;
+    --lark-header-bg: rgba(244,244,245,0.92);
+    --lark-header-border: rgba(0,0,0,0.07);
+    --lark-card-glass-bg: rgba(255,255,255,0.95);
   }
 }
 
@@ -52,6 +92,7 @@
     font-family: 'Space Grotesk', 'Inter', sans-serif;
     background: var(--lark-bg);
     min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 }
 
@@ -64,10 +105,21 @@
   }
 
   .lark-card-glass {
-    background: rgba(17, 17, 19, 0.85);
+    background: var(--lark-card-glass-bg);
     border: 1px solid var(--lark-border);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  [data-theme="day"] .lark-card-glass {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+    border-color: transparent;
+  }
+
+  [data-theme="day"] .lark-card {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+    border-color: transparent;
   }
 
   .lark-glow {

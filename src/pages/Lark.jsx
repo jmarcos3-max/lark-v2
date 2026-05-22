@@ -45,7 +45,7 @@ export default function Lark() {
   return (
     <div
       className="min-h-screen font-grotesk"
-      style={{ background: 'var(--lark-bg)' }}
+      style={{ background: 'var(--lark-bg)', transition: 'background 0.3s ease' }}
     >
       <LarkNavbar />
 
