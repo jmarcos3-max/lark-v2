@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@audiotool/nexus": "^0.0.17",
     "@base44/sdk": "^0.8.30",
     "@base44/vite-plugin": "^1.0.18",
     "@hello-pangea/dnd": "^17.0.0",
