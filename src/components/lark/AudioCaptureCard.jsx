@@ -31,8 +31,17 @@ export default function AudioCaptureCard({ onAudioReady }) {
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  const [micError, setMicError] = useState(null);
+
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    setMicError(null);
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      setMicError('Microphone access denied or no device found. Please check your browser permissions.');
+      return;
+    }
     chunksRef.current = [];
     const mr = new MediaRecorder(stream);
     mr.ondataavailable = e => chunksRef.current.push(e.data);
@@ -140,9 +149,13 @@ export default function AudioCaptureCard({ onAudioReady }) {
             <p className="text-sm font-medium" style={{ color: 'var(--lark-text)' }}>
               {isUploading ? 'Processing...' : 'Record Voice Input'}
             </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--lark-text-muted)' }}>
-              Click to start recording
-            </p>
+            {micError ? (
+              <p className="text-xs mt-1 max-w-[180px]" style={{ color: '#F87171' }}>{micError}</p>
+            ) : (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--lark-text-muted)' }}>
+                Click to start recording
+              </p>
+            )}
           </div>
         )}
       </div>
