@@ -105,15 +105,15 @@ export default function PlaybackEngineCard({ outputUrl, isProcessing }) {
         id="audiotool-nexus-sdk-viewport"
         className="flex-1 rounded-xl flex flex-col overflow-hidden"
         style={{
-          background: 'rgba(0,0,0,0.4)',
-          border: '1px solid rgba(139,92,246,0.15)',
+          background: 'var(--lark-card)',
+          border: '1px solid var(--lark-border)',
           position: 'relative',
         }}
       >
         {/* Viewport label */}
         <div
           className="px-3 py-2 flex items-center gap-1.5"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+          style={{ borderBottom: '1px solid var(--lark-border)' }}
         >
           <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#8B5CF6' }} />
           <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: 'rgba(139,92,246,0.6)' }}>
@@ -155,7 +155,7 @@ export default function PlaybackEngineCard({ outputUrl, isProcessing }) {
           <div className="w-full px-1">
             <div
               className="w-full h-1.5 rounded-full cursor-pointer relative overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.07)' }}
+              style={{ background: 'var(--lark-border-hover)' }}
               onClick={handleSeek}
             >
               {/* Animated idle shimmer when no track */}
