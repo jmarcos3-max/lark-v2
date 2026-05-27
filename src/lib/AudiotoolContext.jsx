@@ -7,7 +7,7 @@ import { audiotool } from '@audiotool/nexus';
  */
 const AudiotoolContext = createContext(null);
 
-const CLIENT_ID = import.meta.env.VITE_AUDIOTOOL_CLIENT_ID;
+const CLIENT_ID = import.meta.env.VITE_AUDIOTOOL_CLIENT_ID || 'ce12318e-0f4b-46a4-8241-79dbd51c8d53';
 const SCOPE = import.meta.env.VITE_AUDIOTOOL_SCOPE || 'project:write';
 
 export function AudiotoolProvider({ children }) {
@@ -19,7 +19,7 @@ export function AudiotoolProvider({ children }) {
   useEffect(() => {
     if (!CLIENT_ID) {
       setStatus('misconfigured');
-      setError('VITE_AUDIOTOOL_CLIENT_ID is not set. Add it to your .env file.');
+      setError('Audiotool client ID is not configured.');
       return;
     }
 
