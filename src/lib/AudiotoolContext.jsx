@@ -24,25 +24,40 @@ export function AudiotoolProvider({ children }) {
       return;
     }
 
-    audiotool({ clientId: CLIENT_ID, redirectUrl: REDIRECT_URL, scope: SCOPE })
+    // Use the current page origin as redirect URL if no env var is set,
+    // so it works on both 127.0.0.1:5173 and deployed/preview URLs.
+    const redirectUrl = REDIRECT_URL || `${window.location.origin}/`;
+
+    audiotool({ clientId: CLIENT_ID, redirectUrl, scope: SCOPE })
       .then(at => {
         setAtClient(at);
         if (at.status === 'authenticated') {
           setStatus('authenticated');
           setUserName(at.userName ?? null);
         } else {
-          if (at.error) setError(at.error);
+          // at.error may be an object or string
+          const errMsg = at.error
+            ? (typeof at.error === 'string' ? at.error : at.error?.message ?? JSON.stringify(at.error))
+            : null;
+          if (errMsg) {
+            console.error('[Audiotool] auth error:', errMsg);
+            setError(errMsg);
+          }
           setStatus('unauthenticated');
         }
       })
       .catch(err => {
-        setError(err?.message ?? String(err));
+        const msg = err?.message ?? String(err);
+        console.error('[Audiotool] init error:', msg);
+        setError(msg);
         setStatus('unauthenticated');
       });
   }, []);
 
   const login = () => {
-    if (atClient && atClient.status === 'unauthenticated') atClient.login();
+    if (atClient && atClient.status === 'unauthenticated') {
+      atClient.login();
+    }
   };
 
   const logout = () => {

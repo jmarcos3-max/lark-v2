@@ -141,6 +141,17 @@ function AudiotoolAuthButton() {
               </p>
             </div>
 
+            {/* Warn if not on a registered redirect origin */}
+            {!window.location.origin.includes('127.0.0.1') && status !== 'misconfigured' && (
+              <div className="w-full flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }}>
+                <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  OAuth requires <code className="font-mono">127.0.0.1:5173</code>. Run the app locally and register that redirect URI at{' '}
+                  <a href="https://developer.audiotool.com/applications" target="_blank" rel="noopener noreferrer" className="underline">developer.audiotool.com</a>.
+                </span>
+              </div>
+            )}
+
             {/* Misconfigured warning */}
             {status === 'misconfigured' && (
               <div className="w-full flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
