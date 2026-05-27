@@ -4,13 +4,18 @@ import AudioCaptureCard from '@/components/lark/AudioCaptureCard';
 import ParameterMatrixCard from '@/components/lark/ParameterMatrixCard';
 import PlaybackEngineCard from '@/components/lark/PlaybackEngineCard';
 import ProjectHistoryCard from '@/components/lark/ProjectHistoryCard';
+import { useAudiotoolProjects } from '@/hooks/useAudiotoolProjects';
 
 export default function Lark() {
+  const { openProject } = useAudiotoolProjects();
+
   const [currentProject, setCurrentProject] = useState({
     title: 'Untitled Track',
     source_audio_url: null,
     target_instrument: null,
     selected_mood: null,
+    atProjectName: null,   // Audiotool project resource name
+    dawUrl: null,          // Active DAW URL for "Open in Studio" link
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [outputUrl, setOutputUrl] = useState(null);
@@ -28,14 +33,30 @@ export default function Lark() {
     setCurrentProject(p => ({ ...p, selected_mood: mood }));
   };
 
-  const handleNewProject = () => {
-    setCurrentProject({ title: 'Untitled Track', source_audio_url: null, target_instrument: null, selected_mood: null });
-    setOutputUrl(null);
+  // Called when ParameterMatrixCard opens/creates a project
+  const handleProjectOpened = (atProject, larkMeta, doc, dawUrl) => {
+    setCurrentProject(p => ({
+      ...p,
+      title: atProject.displayName || p.title,
+      target_instrument: larkMeta?.instrument || p.target_instrument,
+      selected_mood: larkMeta?.mood || p.selected_mood,
+      source_audio_url: larkMeta?.sourceAudioUrl || p.source_audio_url,
+      atProjectName: atProject.name,
+      dawUrl,
+    }));
+    setRefreshHistory(n => n + 1);
+  };
+
+  // Called from ProjectHistoryCard when user clicks a project card
+  const handleOpenFromHistory = async ({ atProject, larkMeta }) => {
+    const result = await openProject(atProject.name);
+    if (result) {
+      handleProjectOpened(atProject, larkMeta, result.doc, result.dawUrl);
+    }
   };
 
   const handleAutomate = async () => {
     setIsProcessing(true);
-    // Simulate processing delay
     await new Promise(r => setTimeout(r, 2800));
     setOutputUrl(currentProject.source_audio_url || null);
     setIsProcessing(false);
@@ -43,21 +64,16 @@ export default function Lark() {
   };
 
   return (
-    <div
-      className="min-h-screen font-grotesk"
-      style={{ background: 'var(--lark-bg)', transition: 'background 0.3s ease' }}
-    >
+    <div className="min-h-screen font-grotesk" style={{ background: 'var(--lark-bg)', transition: 'background 0.3s ease' }}>
       <LarkNavbar />
 
       <main className="px-6 pb-8 pt-4 max-w-[1600px] mx-auto">
         {/* Top bento row */}
         <div className="grid grid-cols-12 gap-4 mb-4">
-          {/* Audio Capture — 4 cols */}
           <div className="col-span-4">
             <AudioCaptureCard onAudioReady={handleAudioReady} />
           </div>
 
-          {/* Parameter Matrix — 4 cols */}
           <div className="col-span-4">
             <ParameterMatrixCard
               instrument={currentProject.target_instrument}
@@ -65,26 +81,24 @@ export default function Lark() {
               onInstrumentChange={handleInstrumentChange}
               onMoodChange={handleMoodChange}
               onAutomate={handleAutomate}
-              onNewProject={handleNewProject}
+              onProjectOpened={handleProjectOpened}
               isProcessing={isProcessing}
-              hasAudio={!!currentProject.source_audio_url}
               currentProject={currentProject}
               onSaved={() => setRefreshHistory(n => n + 1)}
             />
           </div>
 
-          {/* Playback Engine — 4 cols */}
           <div className="col-span-4">
-            <PlaybackEngineCard
-              outputUrl={outputUrl}
-              isProcessing={isProcessing}
-            />
+            <PlaybackEngineCard outputUrl={outputUrl} isProcessing={isProcessing} />
           </div>
         </div>
 
-        {/* Bottom bento row — full width */}
+        {/* Bottom bento row */}
         <div>
-          <ProjectHistoryCard refreshKey={refreshHistory} />
+          <ProjectHistoryCard
+            refreshKey={refreshHistory}
+            onOpenProject={handleOpenFromHistory}
+          />
         </div>
       </main>
     </div>
