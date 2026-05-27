@@ -8,7 +8,6 @@ import { audiotool } from '@audiotool/nexus';
 const AudiotoolContext = createContext(null);
 
 const CLIENT_ID = import.meta.env.VITE_AUDIOTOOL_CLIENT_ID;
-const REDIRECT_URL = import.meta.env.VITE_AUDIOTOOL_REDIRECT_URL || 'http://127.0.0.1:5173/';
 const SCOPE = import.meta.env.VITE_AUDIOTOOL_SCOPE || 'project:write';
 
 export function AudiotoolProvider({ children }) {
@@ -24,9 +23,7 @@ export function AudiotoolProvider({ children }) {
       return;
     }
 
-    // Use the current page origin as redirect URL if no env var is set,
-    // so it works on both 127.0.0.1:5173 and deployed/preview URLs.
-    const redirectUrl = REDIRECT_URL || `${window.location.origin}/`;
+    const redirectUrl = import.meta.env.VITE_AUDIOTOOL_REDIRECT_URL || `${window.location.origin}/`;
 
     audiotool({ clientId: CLIENT_ID, redirectUrl, scope: SCOPE })
       .then(at => {
