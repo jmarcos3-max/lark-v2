@@ -1,6 +1,40 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Upload, FileAudio, CheckCircle, X, Play, Pause, RotateCcw } from 'lucide-react';
+import { Mic, MicOff, FileAudio, CheckCircle, Play, Pause, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+
+const UPLOAD_TIMEOUT_MS = 25_000;
+const RECORD_TIMESLICE_MS = 100;
+const MIN_RECORD_MS = 400;
+
+function getSupportedRecorderMimeType() {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+  ];
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? '';
+}
+
+function extensionForMime(mimeType) {
+  if (mimeType.includes('mp4')) return 'mp4';
+  if (mimeType.includes('ogg')) return 'ogg';
+  return 'webm';
+}
+
+async function uploadToCloud(file) {
+  const result = await Promise.race([
+    base44.integrations.Core.UploadFile({ file }),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timed out — check Base44 config')), UPLOAD_TIMEOUT_MS);
+    }),
+  ]);
+  if (!result?.file_url) {
+    throw new Error('Upload did not return a file URL');
+  }
+  return result.file_url;
+}
 
 // Generates fake waveform data for visual display
 const generateWaveform = (seed = 42, points = 80) => {
@@ -109,7 +143,7 @@ function WaveformTrimmer({ audioUrl, onReset }) {
           onMouseLeave={e => e.currentTarget.style.color = 'var(--lark-text-subtle)'}
         >
           <RotateCcw size={10} />
-          Re-record
+          New recording
         </button>
       </div>
 
@@ -201,72 +235,242 @@ function WaveformTrimmer({ audioUrl, onReset }) {
   );
 }
 
-export default function AudioCaptureCard({ onAudioReady }) {
+export default function AudioCaptureCard({ onAudioReady, importedAudio }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [capturedAudioUrl, setCapturedAudioUrl] = useState(null);
   const [capturedFileName, setCapturedFileName] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
   const [micError, setMicError] = useState(null);
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const localBlobUrlRef = useRef(null);
+  const captureBusyRef = useRef(false);
+  const captureGenerationRef = useRef(0);
+  const mimeTypeRef = useRef('audio/webm');
+  const recordStartedAtRef = useRef(0);
+
+  const isCaptureStale = (generation) => generation !== captureGenerationRef.current;
+
+  const revokeLocalUrl = () => {
+    if (localBlobUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(localBlobUrlRef.current);
+    }
+    localBlobUrlRef.current = null;
+  };
+
+  useEffect(() => () => {
+    revokeLocalUrl();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!importedAudio?.url) return;
+    captureGenerationRef.current += 1;
+    captureBusyRef.current = false;
+    setIsUploading(false);
+    setIsSyncingCloud(false);
+    setMicError(null);
+    setUploadError(null);
+    revokeLocalUrl();
+    setCapturedAudioUrl(importedAudio.url);
+    setCapturedFileName(importedAudio.name || 'Imported recording');
+  }, [importedAudio?.url, importedAudio?.name]);
 
   const handleReset = () => {
+    captureGenerationRef.current += 1;
+    captureBusyRef.current = false;
+    setIsUploading(false);
+    setIsSyncingCloud(false);
+    setMicError(null);
+    setUploadError(null);
+    revokeLocalUrl();
     setCapturedAudioUrl(null);
     setCapturedFileName(null);
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+    mediaRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    clearInterval(timerRef.current);
+    setIsRecording(false);
+    setRecordingTime(0);
     onAudioReady(null);
   };
 
+  const finishCapture = useCallback(async (blob, displayName, fileForUpload) => {
+    if (captureBusyRef.current) return;
+    const generation = captureGenerationRef.current;
+    captureBusyRef.current = true;
+    setIsUploading(false);
+    setUploadError(null);
+
+    revokeLocalUrl();
+    const localUrl = URL.createObjectURL(blob);
+    localBlobUrlRef.current = localUrl;
+    if (isCaptureStale(generation)) {
+      URL.revokeObjectURL(localUrl);
+      captureBusyRef.current = false;
+      return;
+    }
+    setCapturedAudioUrl(localUrl);
+    setCapturedFileName(displayName);
+    onAudioReady(localUrl, { name: displayName, blob, saveToLibrary: true });
+
+    setIsSyncingCloud(true);
+    try {
+      const cloudUrl = await uploadToCloud(fileForUpload);
+      if (isCaptureStale(generation)) return;
+      revokeLocalUrl();
+      localBlobUrlRef.current = cloudUrl;
+      setCapturedAudioUrl(cloudUrl);
+      onAudioReady(cloudUrl, { name: displayName, blob, saveToLibrary: false });
+    } catch (err) {
+      if (isCaptureStale(generation)) return;
+      const message = err instanceof Error ? err.message : 'Cloud upload failed';
+      setUploadError(`${message}. Saved in Raw Audio on this device.`);
+      onAudioReady(localUrl, { name: displayName, blob, saveToLibrary: false });
+    } finally {
+      if (!isCaptureStale(generation)) {
+        setIsSyncingCloud(false);
+      }
+      captureBusyRef.current = false;
+    }
+  }, [onAudioReady]);
+
+  const finalizeRecording = useCallback(() => {
+    const mimeType = mimeTypeRef.current || 'audio/webm';
+    const blob = new Blob(chunksRef.current, { type: mimeType });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setIsUploading(false);
+
+    if (blob.size === 0) {
+      setMicError('No audio captured. Record for at least a second, then stop.');
+      captureBusyRef.current = false;
+      return;
+    }
+
+    const ext = extensionForMime(mimeType);
+    const file = new File([blob], `recording.${ext}`, { type: mimeType });
+    finishCapture(blob, 'Voice Recording', file);
+  }, [finishCapture]);
+
   const startRecording = async () => {
+    if (isUploading || captureBusyRef.current) return;
+    if (typeof MediaRecorder === 'undefined') {
+      setMicError('Recording is not supported in this browser.');
+      return;
+    }
+
     setMicError(null);
+    setUploadError(null);
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+    } catch {
       setMicError('Microphone access denied or no device found. Please check your browser permissions.');
       return;
     }
+
+    streamRef.current = stream;
     chunksRef.current = [];
-    const mr = new MediaRecorder(stream);
-    mr.ondataavailable = e => chunksRef.current.push(e.data);
-    mr.onstop = async () => {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      const file = new File([blob], 'recording.webm', { type: 'audio/webm' });
-      setIsUploading(true);
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setIsUploading(false);
-      setCapturedAudioUrl(file_url);
-      setCapturedFileName('Voice Recording');
-      onAudioReady(file_url);
-      stream.getTracks().forEach(t => t.stop());
+    recordStartedAtRef.current = Date.now();
+
+    const mimeType = getSupportedRecorderMimeType();
+    mimeTypeRef.current = mimeType || 'audio/webm';
+    const mr = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+    mimeTypeRef.current = mr.mimeType || mimeTypeRef.current;
+
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
     };
-    mr.start();
+
+    mr.onerror = () => {
+      setIsUploading(false);
+      setIsRecording(false);
+      captureBusyRef.current = false;
+      setMicError('Recording failed. Try again.');
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+
+    mr.onstop = () => {
+      // Final chunk may arrive after onstop (Safari / Chrome)
+      setTimeout(() => finalizeRecording(), 50);
+    };
+
+    try {
+      mr.start(RECORD_TIMESLICE_MS);
+    } catch {
+      setMicError('Could not start recording. Try another browser or upload a file.');
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
     mediaRecorderRef.current = mr;
     setIsRecording(true);
     setRecordingTime(0);
-    timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    const mr = mediaRecorderRef.current;
+    if (!mr || mr.state === 'inactive') return;
+
+    const elapsed = Date.now() - recordStartedAtRef.current;
+    if (elapsed < MIN_RECORD_MS) {
+      setMicError('Keep recording a little longer (about 1 second), then stop.');
+    }
+
+    setIsUploading(true);
     clearInterval(timerRef.current);
     setIsRecording(false);
+    mediaRecorderRef.current = null;
+
+    try {
+      if (mr.state === 'recording') {
+        mr.requestData();
+        mr.stop();
+      } else {
+        setIsUploading(false);
+      }
+    } catch {
+      setIsUploading(false);
+      setMicError('Could not stop recording. Try again.');
+      captureBusyRef.current = false;
+    }
   };
 
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const handleFile = useCallback(async (file) => {
     if (!file.type.startsWith('audio/')) return;
+    if (captureBusyRef.current) return;
     setIsUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setUploadError(null);
+    await finishCapture(file, file.name, file);
     setIsUploading(false);
-    setCapturedAudioUrl(file_url);
-    setCapturedFileName(file.name);
-    onAudioReady(file_url);
-  }, [onAudioReady]);
+  }, [finishCapture]);
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -287,9 +491,31 @@ export default function AudioCaptureCard({ onAudioReady }) {
           <div className="ml-auto flex items-center gap-1.5 text-[10px]" style={{ color: '#86efac' }}>
             <CheckCircle size={11} style={{ color: '#4ade80' }} />
             {capturedFileName}
+            {isSyncingCloud && (
+              <span style={{ color: 'var(--lark-violet-bright)' }}> · syncing…</span>
+            )}
           </div>
         </div>
+        {uploadError && (
+          <p className="text-[10px] mb-2 leading-snug" style={{ color: '#fbbf24' }}>
+            {uploadError}
+          </p>
+        )}
         <WaveformTrimmer audioUrl={capturedAudioUrl} onReset={handleReset} />
+
+        <button
+          type="button"
+          onClick={handleReset}
+          className="mt-4 w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200"
+          style={{
+            background: 'rgba(139,92,246,0.12)',
+            border: '1px solid rgba(139,92,246,0.35)',
+            color: 'var(--lark-violet-bright)',
+          }}
+        >
+          <Mic size={15} />
+          New recording
+        </button>
       </div>
     );
   }
@@ -351,7 +577,7 @@ export default function AudioCaptureCard({ onAudioReady }) {
               <p className="text-xs mt-1 max-w-[180px]" style={{ color: '#F87171' }}>{micError}</p>
             ) : (
               <p className="text-xs mt-0.5" style={{ color: 'var(--lark-text-muted)' }}>
-                Click to start recording
+                Click to record — speak for at least 1 second
               </p>
             )}
           </div>

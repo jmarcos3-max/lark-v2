@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Music, Calendar, Layers, RefreshCw, AlertCircle } from 'lucide-react';
-import { useAudiotool } from '@/lib/AudiotoolContext';
-import { useAudiotoolProjects } from '@/hooks/useAudiotoolProjects';
+import { Trash2, Music, Calendar, Layers, RefreshCw, Loader2, Pencil } from 'lucide-react';
+import { format } from 'date-fns';
+import RenameInline from '@/components/lark/RenameInline';
+import {
+  AUDIOTOOL_DELETE_ON_WEB_CONFIRM,
+  AUDIOTOOL_PROJECTS_URL,
+  isAudiotoolPermissionDenied,
+} from '@/lib/audiotool-api';
+import { audiotoolProjectToLark } from '@/lib/lark-project-metadata';
 
 const INSTRUMENT_COLORS = {
   Piano: { bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.35)', text: '#A5B4FC' },
@@ -31,128 +37,290 @@ function Badge({ label, colors }) {
   );
 }
 
-export default function ProjectHistoryCard({ refreshKey, onOpenProject }) {
-  const { status } = useAudiotool();
-  const { loading, error, listProjects, deleteProject } = useAudiotoolProjects();
-  const [projects, setProjects] = useState([]);
+function timestampToDate(ts) {
+  if (!ts) return null;
+  const seconds = Number(ts.seconds ?? 0);
+  const nanos = Number(ts.nanos ?? 0);
+  return new Date(seconds * 1000 + nanos / 1e6);
+}
+
+export default function ProjectHistoryCard({
+  refreshKey,
+  cloudProjects = [],
+  isAuthenticated,
+  onLogin,
+  onOpenProject,
+  onRefreshProjects,
+  onDeleteProject,
+  onRenameProject,
+  activeProjectName,
+  embedded = false,
+}) {
+  const [isLoading, setIsLoading] = useState(true);
   const [deletingName, setDeletingName] = useState(null);
+  const [renamingName, setRenamingName] = useState(null);
 
-  const isAuthenticated = status === 'authenticated';
-
-  const load = async () => {
-    if (!isAuthenticated) { setProjects([]); return; }
-    const list = await listProjects();
-    setProjects(list);
+  const loadProjects = async () => {
+    if (!isAuthenticated) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await onRefreshProjects?.();
+    } catch {
+      // errors handled upstream
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [refreshKey, isAuthenticated]);
+  useEffect(() => {
+    loadProjects();
+  }, [refreshKey, isAuthenticated]);
 
-  const handleDelete = async (projectName) => {
+  const handleDelete = async (projectName, e) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      onLogin?.();
+      return;
+    }
     setDeletingName(projectName);
-    const ok = await deleteProject(projectName);
-    if (ok) setProjects(p => p.filter(x => x.atProject.name !== projectName));
-    setDeletingName(null);
+    try {
+      await onDeleteProject?.(projectName);
+    } catch (err) {
+      if (isAudiotoolPermissionDenied(err)) {
+        const open = window.confirm(AUDIOTOOL_DELETE_ON_WEB_CONFIRM);
+        if (open) {
+          window.open(AUDIOTOOL_PROJECTS_URL, '_blank', 'noopener,noreferrer');
+        }
+      }
+    } finally {
+      setDeletingName(null);
+    }
   };
 
-  return (
-    <div className="lark-card-glass rounded-2xl p-5" style={{ minHeight: '180px' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }} />
-          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
-            Dashboard History
-          </span>
-          {projects.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono" style={{ background: 'rgba(139,92,246,0.12)', color: 'rgba(139,92,246,0.7)', border: '1px solid rgba(139,92,246,0.2)' }}>
-              {projects.length}
-            </span>
-          )}
-        </div>
-        <button onClick={load} className="p-1.5 rounded-lg transition-all duration-200" style={{ color: 'var(--lark-text-muted)' }} title="Refresh">
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-        </button>
-      </div>
+  const handleRename = async (projectName, newTitle) => {
+    if (!isAuthenticated) {
+      onLogin?.();
+      return;
+    }
+    try {
+      await onRenameProject?.(projectName, newTitle);
+    } catch {
+      // error surfaced upstream
+    } finally {
+      setRenamingName(null);
+    }
+  };
 
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 text-[10px] mb-3 px-2 py-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <AlertCircle size={10} /> {error}
-        </div>
-      )}
+  const items = cloudProjects.map((p) => ({
+    ...audiotoolProjectToLark(p),
+    raw: p,
+  }));
 
-      {!isAuthenticated ? (
+  const content = !isAuthenticated ? (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
           <Layers size={24} style={{ color: 'var(--lark-text-subtle)', opacity: 0.4 }} />
-          <p className="text-xs" style={{ color: 'var(--lark-text-subtle)' }}>Sign in with Audiotool to see your projects.</p>
+          <p className="text-xs text-center" style={{ color: 'var(--lark-text-subtle)' }}>
+            Sign in with Audiotool to see your cloud projects.
+          </p>
         </div>
-      ) : loading && projects.length === 0 ? (
+      ) : isLoading ? (
         <div className="grid grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl p-3 animate-pulse" style={{ height: '90px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }} />
+            <div
+              key={i}
+              className="rounded-xl p-3 animate-pulse"
+              style={{ height: '90px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+            />
           ))}
         </div>
-      ) : projects.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
           <Layers size={24} style={{ color: 'var(--lark-text-subtle)', opacity: 0.4 }} />
-          <p className="text-xs" style={{ color: 'var(--lark-text-subtle)' }}>No projects yet. Create your first track above.</p>
+          <p className="text-xs" style={{ color: 'var(--lark-text-subtle)' }}>
+            No projects yet. Create one with New Project above.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lark-scrollbar overflow-y-auto max-h-64">
-          {projects.map(({ atProject, larkMeta }) => (
-            <div
-              key={atProject.name}
-              className="relative group rounded-xl p-3 flex flex-col gap-2 transition-all duration-200 cursor-pointer"
-              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onClick={() => onOpenProject?.({ atProject, larkMeta })}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.05)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
-            >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <Music size={14} style={{ color: '#A78BFA' }} />
-              </div>
+          {items.map((project) => {
+            const date = timestampToDate(project.updateTime ?? project.createTime);
+            const isActive = project.audiotoolName === activeProjectName;
+            return (
+              <button
+                key={project.audiotoolName}
+                type="button"
+                onClick={() => onOpenProject?.(project.audiotoolName)}
+                className="relative group rounded-xl p-3 flex flex-col gap-2 transition-all duration-200 text-left w-full"
+                style={{
+                  background: isActive ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)',
+                  border: isActive ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(139,92,246,0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                  }
+                }}
+              >
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                  style={{
+                    background: 'rgba(139,92,246,0.12)',
+                    border: '1px solid rgba(139,92,246,0.2)',
+                  }}
+                >
+                  <Music size={14} style={{ color: '#A78BFA' }} />
+                </div>
 
-              <p className="text-xs font-medium truncate" style={{ color: 'var(--lark-text)' }}>
-                {atProject.displayName || 'Untitled'}
-              </p>
-
-              <div className="flex flex-wrap gap-1">
-                {larkMeta?.instrument && (
-                  <Badge label={larkMeta.instrument} colors={INSTRUMENT_COLORS[larkMeta.instrument]} />
+                {renamingName === project.audiotoolName ? (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <RenameInline
+                      value={project.title || 'Untitled Track'}
+                      onSave={(title) => handleRename(project.audiotoolName, title)}
+                      onCancel={() => setRenamingName(null)}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs font-medium truncate" style={{ color: 'var(--lark-text)' }}>
+                    {project.title || 'Untitled Track'}
+                  </p>
                 )}
-                {larkMeta?.mood && (
-                  <Badge
-                    label={`${MOOD_ICONS[larkMeta.mood] || ''} ${larkMeta.mood}`}
-                    colors={MOOD_COLORS[larkMeta.mood]}
-                  />
-                )}
-              </div>
 
-              {atProject.createTime && (
+                <div className="flex flex-wrap gap-1">
+                  {project.target_instrument && (
+                    <Badge
+                      label={project.target_instrument}
+                      colors={INSTRUMENT_COLORS[project.target_instrument]}
+                    />
+                  )}
+                  {project.selected_mood && (
+                    <Badge
+                      label={`${MOOD_ICONS[project.selected_mood] || ''} ${project.selected_mood}`}
+                      colors={MOOD_COLORS[project.selected_mood]}
+                    />
+                  )}
+                </div>
+
                 <div className="flex items-center gap-1">
                   <Calendar size={9} style={{ color: 'var(--lark-text-subtle)' }} />
                   <span className="text-[9px] font-mono" style={{ color: 'var(--lark-text-subtle)' }}>
-                    {new Date(Number(atProject.createTime.seconds) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                    {date ? format(date, 'MMM d, yy') : '—'}
                   </span>
                 </div>
-              )}
 
-              <button
-                onClick={e => { e.stopPropagation(); handleDelete(atProject.name); }}
-                disabled={deletingName === atProject.name}
-                className="absolute top-2 right-2 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-150"
-                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}
-              >
-                {deletingName === atProject.name ? (
-                  <div className="w-2.5 h-2.5 border border-red-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Trash2 size={10} />
-                )}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
+                  {onRenameProject && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRenamingName(project.audiotoolName);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation();
+                          setRenamingName(project.audiotoolName);
+                        }
+                      }}
+                      className="p-1 rounded-md"
+                      style={{
+                        background: 'rgba(128,128,128,0.12)',
+                        border: '1px solid var(--lark-border)',
+                        color: 'var(--lark-text-muted)',
+                      }}
+                      title="Rename"
+                    >
+                      <Pencil size={10} />
+                    </span>
+                  )}
+                  {onDeleteProject && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => handleDelete(project.audiotoolName, e)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleDelete(project.audiotoolName, e);
+                      }}
+                      className="p-1 rounded-md"
+                      style={{
+                        background: 'rgba(239,68,68,0.12)',
+                        border: '1px solid rgba(239,68,68,0.2)',
+                        color: '#FCA5A5',
+                      }}
+                      title="Delete"
+                    >
+                      {deletingName === project.audiotoolName ? (
+                        <Loader2 size={10} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={10} />
+                      )}
+                    </span>
+                  )}
+                </div>
               </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+      );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div
+      className="lark-card-glass rounded-2xl p-5"
+      style={{ minHeight: '180px' }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-1.5 h-5 rounded-full"
+            style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }}
+          />
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
+            Audiotool Projects
+          </span>
+          {items.length > 0 && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-full font-mono"
+              style={{
+                background: 'rgba(139,92,246,0.12)',
+                color: 'rgba(139,92,246,0.7)',
+                border: '1px solid rgba(139,92,246,0.2)',
+              }}
+            >
+              {items.length}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!isAuthenticated) {
+              onLogin?.();
+              return;
+            }
+            loadProjects();
+          }}
+          className="p-1.5 rounded-lg transition-all duration-200"
+          style={{ color: 'var(--lark-text-muted)' }}
+          title="Refresh"
+        >
+          <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+      {content}
     </div>
   );
 }

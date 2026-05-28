@@ -1,10 +1,54 @@
 import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { defineConfig, loadEnv } from 'vite'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  const elevenLabsKey = env.ELEVENLABS_API_KEY || env.VITE_ELEVENLABS_API_KEY
+
+  return {
   logLevel: 'error', // Suppress warnings, only show errors
+  server: {
+    // Audiotool OAuth requires 127.0.0.1, not localhost — see developer.audiotool.com docs
+    host: '127.0.0.1',
+    port: 5173,
+    proxy: elevenLabsKey
+      ? {
+          '/api/elevenlabs': {
+            target: 'https://api.elevenlabs.io',
+            changeOrigin: true,
+            rewrite: (p) => p.replace(/^\/api\/elevenlabs/, ''),
+            configure: (proxy) => {
+              proxy.on('proxyReq', (proxyReq) => {
+                proxyReq.setHeader('xi-api-key', elevenLabsKey)
+              })
+            },
+          },
+        }
+      : undefined,
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      react: path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
+    },
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    // Pre-bundle Nexus (CJS dep toposort needs a default-export shim in dev).
+    include: [
+      '@audiotool/nexus',
+      '@audiotool/nexus/utils',
+      '@spotify/basic-pitch',
+      '@tensorflow/tfjs',
+    ],
+  },
   plugins: [
     base44({
       // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
@@ -12,9 +56,10 @@ export default defineConfig({
       legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true',
       hmrNotifier: true,
       navigationNotifier: true,
-      analyticsTracker: true,
+      analyticsTracker: Boolean(process.env.VITE_BASE44_APP_ID),
       visualEditAgent: true
     }),
     react(),
-  ]
+  ],
+  }
 });

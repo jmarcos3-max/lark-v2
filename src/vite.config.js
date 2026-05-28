@@ -26,6 +26,6 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
-    exclude: ['@audiotool/nexus'],
+    include: ['@audiotool/nexus'],
   },
 });
