@@ -334,7 +334,7 @@ export function useAudiotoolProjects() {
         throw new Error('Record or import humming first.');
       }
       if (!instrument) {
-        throw new Error('Choose a target instrument (Piano, Bass, Drums, or Guitar).');
+        throw new Error('Choose a target instrument first.');
       }
       if (!mood) {
         throw new Error('Choose a mood.');
@@ -440,7 +440,7 @@ export function useAudiotoolProjects() {
         }
         return layers;
       });
-      setProjectSuccess(`Generated ${layers.length} mood layers with ElevenLabs.`);
+      setProjectSuccess(`Generated ${layers.length} wow-pass assets with ElevenLabs.`);
       return layers;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

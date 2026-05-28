@@ -8,7 +8,7 @@ import { listRawAudioEntries } from '@/lib/raw-audio-library';
 const TABS = [
   { id: 'projects', label: 'Audiotool Projects' },
   { id: 'raw', label: 'Raw Audio' },
-  { id: 'layers', label: 'Mood Layers' },
+  { id: 'layers', label: 'Wow Pass' },
 ];
 
 export default function ProjectLibraryPanel(props) {

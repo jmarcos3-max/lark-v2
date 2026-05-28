@@ -1,14 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Zap, Loader2, Save, Plus, RefreshCw, ExternalLink, Layers } from 'lucide-react';
 import { audiotoolProjectToLark } from '@/lib/lark-project-metadata';
-import { studioDeviceName } from '@/lib/lark-instruments';
-
-const INSTRUMENTS = [
-  { value: 'Piano', icon: '🎹' },
-  { value: 'Bass', icon: '🎸' },
-  { value: 'Drums', icon: '🥁' },
-  { value: 'Guitar', icon: '🎵' },
-];
+import { studioDeviceName, TARGET_INSTRUMENTS } from '@/lib/lark-instruments';
 
 const MOODS = [
   { value: 'Calm', icon: '🌊' },
@@ -264,7 +257,7 @@ export default function ParameterMatrixCard({
           Target Instrument
         </label>
         <div className="grid grid-cols-4 gap-2">
-          {INSTRUMENTS.map(({ value, icon }) => (
+          {TARGET_INSTRUMENTS.map(({ value, icon, supportsAudiotool, supportsElevenLabs }) => (
             <button
               key={value}
               onClick={() => onInstrumentChange(value)}
@@ -289,6 +282,12 @@ export default function ParameterMatrixCard({
                 style={{ color: instrument === value ? 'var(--lark-violet-bright)' : 'var(--lark-text-subtle)' }}
               >
                 {studioDeviceName(value)}
+              </span>
+              <span
+                className="text-[8px] leading-tight opacity-70"
+                style={{ color: instrument === value ? 'var(--lark-violet-bright)' : 'var(--lark-text-subtle)' }}
+              >
+                {supportsAudiotool && supportsElevenLabs ? 'AT + 11L' : supportsAudiotool ? 'AT only' : '11L only'}
               </span>
             </button>
           ))}
@@ -466,12 +465,12 @@ export default function ParameterMatrixCard({
         {isGeneratingMoodLayers ? (
           <>
             <Loader2 size={14} className="animate-spin" />
-            <span>Generating mood layers…</span>
+            <span>Generating wow pass…</span>
           </>
         ) : (
           <>
             <Layers size={14} />
-            <span>Generate mood layers (ElevenLabs)</span>
+            <span>Generate wow pass (ElevenLabs)</span>
           </>
         )}
       </button>

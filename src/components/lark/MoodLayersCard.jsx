@@ -37,7 +37,7 @@ export default function MoodLayersCard({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-[10px]" style={{ color: 'var(--lark-text-subtle)' }}>
-          Generate optional ElevenLabs layers from your selected mood.
+          Generate ElevenLabs wow assets to add polish and excitement.
         </p>
         <button
           type="button"
@@ -52,7 +52,7 @@ export default function MoodLayersCard({
           }}
         >
           {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
-          {isGenerating ? 'Generating…' : 'Generate layers'}
+          {isGenerating ? 'Generating…' : 'Generate wow pass'}
         </button>
       </div>
 
@@ -62,7 +62,7 @@ export default function MoodLayersCard({
           style={{ border: '1px dashed rgba(139,92,246,0.25)', color: 'var(--lark-text-subtle)' }}
         >
           <Music2 size={18} className="mx-auto mb-2 opacity-50" />
-          <p className="text-xs">No mood layers yet.</p>
+          <p className="text-xs">No wow-pass assets yet.</p>
         </div>
       ) : (
         layers.map((layer) => (
@@ -90,7 +90,7 @@ export default function MoodLayersCard({
                   border: '1px solid rgba(139,92,246,0.4)',
                   color: 'var(--lark-violet-bright)',
                 }}
-                title={playingId === layer.id ? 'Pause layer' : 'Play layer'}
+                title={playingId === layer.id ? 'Pause asset' : 'Play asset'}
               >
                 {playingId === layer.id ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
               </button>
@@ -103,7 +103,7 @@ export default function MoodLayersCard({
                   border: '1px solid rgba(255,255,255,0.12)',
                   color: 'var(--lark-text-muted)',
                 }}
-                title="Use this layer in Playback Engine"
+                title="Use this asset in Playback Engine"
               >
                 Use
               </button>

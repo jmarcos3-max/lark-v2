@@ -3,6 +3,7 @@ import LarkNavbar from '@/components/lark/LarkNavbar';
 import AudioCaptureCard from '@/components/lark/AudioCaptureCard';
 import ParameterMatrixCard from '@/components/lark/ParameterMatrixCard';
 import PlaybackEngineCard from '@/components/lark/PlaybackEngineCard';
+import StudioHealthCard from '@/components/lark/StudioHealthCard';
 import ProjectLibraryPanel from '@/components/lark/ProjectLibraryPanel';
 import { addRawAudioEntry, getRawAudioBlob } from '@/lib/raw-audio-library';
 import { useAudiotoolProjects } from '@/lib/useAudiotoolProjects';
@@ -37,6 +38,7 @@ export default function Lark() {
   const [importedAudio, setImportedAudio] = useState(null);
   const [activeRawAudioId, setActiveRawAudioId] = useState(null);
   const [lastTransformBpm, setLastTransformBpm] = useState(null);
+  const [studioHealthReport, setStudioHealthReport] = useState(null);
   const importBlobUrlRef = useRef(null);
   /** Session humming — survives project switches (cloud metadata may not store blob URLs). */
   const activeHumRef = useRef({ url: null, blob: null });
@@ -191,6 +193,16 @@ export default function Lark() {
       if (Number.isFinite(result?.bpm)) {
         setLastTransformBpm(result.bpm);
       }
+      if (result) {
+        setStudioHealthReport({
+          noteCount: result.noteCount ?? 0,
+          bpm: result.bpm ?? null,
+          nexusCabled: Boolean(result.nexusCabled),
+          instrument: larkProject.target_instrument,
+          mood: larkProject.selected_mood,
+          dawUrl: result.dawUrl ?? larkProject.dawUrl ?? null,
+        });
+      }
       if (result?.outputUrl) {
         setOutputUrl(result.outputUrl);
       } else if (larkProject.source_audio_url) {
@@ -274,11 +286,18 @@ export default function Lark() {
           </div>
 
           <div className="col-span-4">
-            <PlaybackEngineCard
-              outputUrl={outputUrl}
-              isProcessing={isProcessing}
-              dawUrl={larkProject.dawUrl}
-            />
+            <div className="h-full flex flex-col gap-4">
+              <StudioHealthCard
+                currentProject={larkProject}
+                report={studioHealthReport}
+                projectError={projectError}
+              />
+              <PlaybackEngineCard
+                outputUrl={outputUrl}
+                isProcessing={isProcessing}
+                dawUrl={larkProject.dawUrl}
+              />
+            </div>
           </div>
         </div>
 

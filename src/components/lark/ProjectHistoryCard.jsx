@@ -15,6 +15,11 @@ const INSTRUMENT_COLORS = {
   Drums: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', text: '#FCD34D' },
   Guitar: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)', text: '#6EE7B7' },
 };
+const DEFAULT_INSTRUMENT_COLORS = {
+  bg: 'rgba(139,92,246,0.12)',
+  border: 'rgba(139,92,246,0.3)',
+  text: '#C4B5FD',
+};
 
 const MOOD_COLORS = {
   Calm: { bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.25)', text: '#7DD3FC' },
@@ -199,7 +204,7 @@ export default function ProjectHistoryCard({
                   {project.target_instrument && (
                     <Badge
                       label={project.target_instrument}
-                      colors={INSTRUMENT_COLORS[project.target_instrument]}
+                      colors={INSTRUMENT_COLORS[project.target_instrument] ?? DEFAULT_INSTRUMENT_COLORS}
                     />
                   )}
                   {project.selected_mood && (

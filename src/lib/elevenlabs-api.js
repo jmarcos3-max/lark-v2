@@ -159,8 +159,13 @@ export async function composeMoodLayers({
   mood,
   bpm,
   durationMs,
-  layerTypes = ['pad texture', 'percussion bed', 'counter melody'],
+  layerTypes = ['hook double', 'riser', 'impact'],
 }) {
+  const durationByType = {
+    'hook double': Math.min(Math.max(durationMs * 0.9, 6000), 22000),
+    riser: 5000,
+    impact: 3000,
+  };
   const layers = [];
   for (const layerType of layerTypes) {
     const prompt = buildElevenLabsLayerPrompt({
@@ -169,7 +174,10 @@ export async function composeMoodLayers({
       layerType,
       bpm,
     });
-    const blob = await composeLayerFromPrompt(prompt, durationMs);
+    const blob = await composeLayerFromPrompt(
+      prompt,
+      durationByType[layerType] ?? durationMs,
+    );
     layers.push({
       id: `${Date.now()}-${layerType.replace(/\s+/g, '-')}`,
       label: layerType,

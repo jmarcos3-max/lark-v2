@@ -9,6 +9,17 @@ export const NEXUS_DEVICE_BY_INSTRUMENT = {
   Guitar: 'gakki',
 };
 
+/**
+ * Canonical target-instrument list used by UI and transforms.
+ * Each option is supported by both Audiotool (Nexus write) and ElevenLabs prompts.
+ */
+export const TARGET_INSTRUMENTS = [
+  { value: 'Piano', icon: '🎹', supportsAudiotool: true, supportsElevenLabs: true },
+  { value: 'Bass', icon: '🎸', supportsAudiotool: true, supportsElevenLabs: true },
+  { value: 'Drums', icon: '🥁', supportsAudiotool: true, supportsElevenLabs: true },
+  { value: 'Guitar', icon: '🎵', supportsAudiotool: true, supportsElevenLabs: true },
+];
+
 /** Gakki soundfont IDs from Audiotool Nexus defaults. */
 export const GAKKI_SOUNDFONT_ID = {
   piano: 'ce79731c-f100-4f54-9ccc-2d2c60269483',
@@ -68,10 +79,15 @@ export function buildElevenLabsMusicPrompt(instrument, mood) {
 export function buildElevenLabsLayerPrompt({ instrument, mood, layerType, bpm }) {
   const style = MOOD_STYLE[mood] ?? 'balanced studio mix';
   const rhythmHint = Number.isFinite(bpm) ? `around ${Math.round(bpm)} BPM` : 'steady tempo';
+  const assetIntent = {
+    'hook double': 'a catchy melodic support line that reinforces the hook',
+    riser: 'a transition riser that builds tension into the next phrase',
+    impact: 'a short impact hit for downbeats and section starts',
+  }[layerType] ?? `one ${layerType} layer`;
   return [
-    `Create one ${layerType} layer for a ${instrument} idea, ${style}, ${rhythmHint}.`,
+    `Create ${assetIntent} for a ${instrument} idea, ${style}, ${rhythmHint}.`,
     'No lead vocals, no spoken words.',
-    'Designed to sit underneath an existing melody in a DAW.',
+    'Make it exciting and polished, designed to layer with an existing melody in a DAW.',
   ].join(' ');
 }
 
