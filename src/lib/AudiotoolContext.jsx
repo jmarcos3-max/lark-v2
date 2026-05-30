@@ -9,8 +9,8 @@ import React, {
 } from 'react';
 import {
   AUDIOTOOL_CLIENT_ID,
-  AUDIOTOOL_REDIRECT_URL,
   AUDIOTOOL_SCOPE,
+  getAudiotoolRedirectUrl,
 } from '@/lib/audiotool-config';
 import { formatAuthError, getAudiotoolSetupIssues } from '@/lib/audiotool-setup';
 
@@ -83,7 +83,7 @@ export function AudiotoolProvider({ children }) {
       const { audiotool } = await import('@audiotool/nexus');
       const at = await audiotool({
         clientId: AUDIOTOOL_CLIENT_ID,
-        redirectUrl: AUDIOTOOL_REDIRECT_URL,
+        redirectUrl: getAudiotoolRedirectUrl(),
         scope: AUDIOTOOL_SCOPE,
       });
       if (initGenerationRef.current !== generation || timedOut) return;

@@ -37,6 +37,8 @@ VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 | Dev server host | `vite.config.js` → `host: '127.0.0.1'`, `port: 5173` |
 | Open in browser | `http://127.0.0.1:5173/` (not `localhost`) |
 | Redirect URI (portal + `.env.local`) | `http://127.0.0.1:5173/` (trailing slash required) |
+| Redirect URI (GitHub Pages) | `https://<your-github-user>.github.io/lark/` — add in [Audiotool developer portal](https://developer.audiotool.com/applications) |
+| GitHub Pages secrets | Repo → Settings → Secrets → `VITE_AUDIOTOOL_CLIENT_ID` (and optional `VITE_AUDIOTOOL_REDIRECT_URL`) |
 | Scope (portal + app) | `project:write` |
 | Login button | Calls `at.login()` from `audiotool()` per docs |
 
