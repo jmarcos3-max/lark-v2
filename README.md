@@ -68,12 +68,9 @@ Run the app: `npm run dev`
 
 URL: `https://<your-github-user>.github.io/lark/` (project site for repo `lark`).
 
-After pushing to `main`, the deploy workflow builds `dist/` and publishes it. **If you see a 404 or blank page**, GitHub is probably serving the repo root instead of the build:
+Pushes to `main` run the deploy workflow, which builds with `npm run build:pages` and commits production `index.html`, `assets/`, and `404.html` to the repo root. GitHub Pages serves those from **main → / (root)**.
 
-1. Open the repo on GitHub → **Settings** → **Pages**
-2. The deploy workflow builds `dist/`, pushes it to the **`gh-pages`** branch, and tries to set Pages to that branch automatically.
-3. If the site is still broken, set **Source** manually to **Deploy from a branch** → **`gh-pages`** → **`/ (root)`**. Do **not** use **main** `/ (root)` — that serves dev `index.html` with `/src/main.jsx`.
-4. Hard-refresh the site (or wait a few minutes for CDN cache).
+Local dev still uses `index.dev.html` via the Vite dev server — run `npm run dev` as usual.
 
 **Publish your changes**
 

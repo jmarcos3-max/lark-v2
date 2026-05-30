@@ -6,6 +6,23 @@ import { defineConfig, loadEnv } from 'vite'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+/** Dev server serves index.dev.html so root index.html can stay production-built for Pages. */
+function devIndexPlugin() {
+  return {
+    name: 'lark-dev-index',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const [pathname, search = ''] = (req.url ?? '').split('?')
+        if (pathname === '/' || pathname === '/index.html') {
+          req.url = `/index.dev.html${search ? `?${search}` : ''}`
+        }
+        next()
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '')
@@ -54,6 +71,7 @@ export default defineConfig(({ mode }) => {
     ],
   },
   plugins: [
+    devIndexPlugin(),
     base44({
       // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
       // can be removed if the code has been updated to use the new SDK imports from @base44/sdk
