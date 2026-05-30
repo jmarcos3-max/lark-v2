@@ -9,6 +9,12 @@ import { ThemeProvider } from '@/lib/ThemeContext';
 import { AudiotoolProvider } from '@/lib/AudiotoolContext';
 import Lark from './pages/Lark';
 
+function routerBasename() {
+  const base = import.meta.env.BASE_URL || '/';
+  if (base === '/') return '/';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
 /** Catches runtime errors (e.g. SDK init) instead of a blank white screen. */
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -51,7 +57,7 @@ function App() {
         <AuthProvider>
           <AudiotoolProvider>
             <QueryClientProvider client={queryClientInstance}>
-              <Router basename={import.meta.env.BASE_URL}>
+              <Router basename={routerBasename()}>
                 <Routes>
                   <Route path="/" element={<Lark />} />
                   <Route path="*" element={<PageNotFound />} />

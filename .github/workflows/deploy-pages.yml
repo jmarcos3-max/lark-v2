@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Use dev entry HTML for Vite build
+        run: cp index.dev.html index.html
+
       - name: Build and sync Pages root files
         env:
           GITHUB_ACTIONS: true
@@ -57,7 +60,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html 404.html .nojekyll assets docs
+          git add -f index.html 404.html .nojekyll assets docs
           git diff --staged --quiet || git commit -m "Deploy site to repo root [skip ci]"
           git push origin HEAD:main
 

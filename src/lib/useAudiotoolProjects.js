@@ -10,7 +10,6 @@ import {
   fetchAudioBlob,
   getAudioDurationMs,
 } from '@/lib/elevenlabs-api';
-import { transcribeHumToNotes } from '@/lib/hum-basic-pitch';
 import {
   audiotoolProjectToLark,
   encodeLarkMetadata,
@@ -354,6 +353,7 @@ export function useAudiotoolProjects() {
 
       const blob = await fetchAudioBlob(sourceUrl, sourceBlobOverride);
 
+      const { transcribeHumToNotes } = await import('@/lib/hum-basic-pitch');
       const transcription = await transcribeHumToNotes(blob, {
         instrument,
         mood,
