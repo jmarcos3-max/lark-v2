@@ -71,10 +71,8 @@ URL: `https://<your-github-user>.github.io/lark/` (project site for repo `lark`)
 After pushing to `main`, the deploy workflow builds `dist/` and publishes it. **If you see a 404 or blank page**, GitHub is probably serving the repo root instead of the build:
 
 1. Open the repo on GitHub → **Settings** → **Pages**
-2. Under **Build and deployment**, set **Source** to either:
-   - **GitHub Actions** (uses the workflow’s `deploy-pages` job), or
-   - **Deploy from a branch** → branch **`gh-pages`** → folder **`/ (root)`** (uses the built files pushed by the workflow)
-3. Do **not** use **main** branch `/ (root)` — that serves dev `index.html` with `/src/main.jsx`, which cannot run on Pages.
+2. The deploy workflow builds `dist/`, pushes it to the **`gh-pages`** branch, and tries to set Pages to that branch automatically.
+3. If the site is still broken, set **Source** manually to **Deploy from a branch** → **`gh-pages`** → **`/ (root)`**. Do **not** use **main** `/ (root)` — that serves dev `index.html` with `/src/main.jsx`.
 4. Hard-refresh the site (or wait a few minutes for CDN cache).
 
 **Publish your changes**
