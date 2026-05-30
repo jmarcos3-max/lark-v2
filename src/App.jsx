@@ -51,7 +51,7 @@ function App() {
         <AuthProvider>
           <AudiotoolProvider>
             <QueryClientProvider client={queryClientInstance}>
-              <Router>
+              <Router basename={import.meta.env.BASE_URL}>
                 <Routes>
                   <Route path="/" element={<Lark />} />
                   <Route path="*" element={<PageNotFound />} />
