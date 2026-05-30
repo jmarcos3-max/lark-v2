@@ -3,12 +3,14 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:
+    paths-ignore:
+      - "docs/**"
 
 permissions:
   contents: write
   pages: write
   id-token: write
+  administration: write
 
 concurrency:
   group: "pages"
@@ -64,23 +66,53 @@ jobs:
           publish_dir: ./dist
           force_orphan: true
 
-      - name: Point GitHub Pages at gh-pages branch
+      - name: Mirror built site into docs/ on main
+        run: |
+          rm -rf docs
+          cp -r dist docs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git diff --staged --quiet || git commit -m "Deploy site to docs [skip ci]"
+          git push
+
+      - name: Enable GitHub Pages on gh-pages branch
         uses: actions/github-script@v7
+        continue-on-error: true
+        id: pages_config
         with:
           script: |
             const { owner, repo } = context.repo;
-            try {
+            const source = { branch: 'gh-pages', path: '/' };
+
+            async function enablePages() {
+              try {
+                await github.rest.repos.createPagesSite({
+                  owner,
+                  repo,
+                  source,
+                  build_type: 'legacy',
+                });
+                core.info('Created Pages site from gh-pages branch.');
+                return;
+              } catch (error) {
+                if (error.status !== 409) throw error;
+              }
+
               await github.rest.repos.updatePages({
                 owner,
                 repo,
                 build_type: 'legacy',
-                source: { branch: 'gh-pages', path: '/' },
+                source,
               });
-              core.info('Pages source set to gh-pages / (root).');
-            } catch (error) {
-              core.setFailed(
-                `Could not set Pages source automatically (${error.status ?? 'unknown'}). ` +
-                  'Open repo Settings → Pages → Deploy from branch → gh-pages → / (root).',
-              );
-              throw error;
+              core.info('Updated Pages site to gh-pages branch.');
             }
+
+            await enablePages();
+
+      - name: Pages settings reminder
+        if: steps.pages_config.outcome == 'failure'
+        run: |
+          echo "::warning::Could not switch Pages source automatically."
+          echo "::warning::Open Settings → Pages → Deploy from branch → gh-pages → / (root)"
+          echo "::warning::Or use main → /docs if gh-pages is unavailable."
