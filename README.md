@@ -64,6 +64,19 @@ Code: `src/lib/nexus-rhythm-notes.js`, `src/lib/nexus-mixer-routing.js`
 
 Run the app: `npm run dev`
 
+**GitHub Pages (Lark live site)**
+
+URL: `https://<your-github-user>.github.io/lark/` (project site for repo `lark`).
+
+After pushing to `main`, the deploy workflow builds `dist/` and publishes it. **If you see a 404 or blank page**, GitHub is probably serving the repo root instead of the build:
+
+1. Open the repo on GitHub → **Settings** → **Pages**
+2. Under **Build and deployment**, set **Source** to either:
+   - **GitHub Actions** (uses the workflow’s `deploy-pages` job), or
+   - **Deploy from a branch** → branch **`gh-pages`** → folder **`/ (root)`** (uses the built files pushed by the workflow)
+3. Do **not** use **main** branch `/ (root)` — that serves dev `index.html` with `/src/main.jsx`, which cannot run on Pages.
+4. Hard-refresh the site (or wait a few minutes for CDN cache).
+
 **Publish your changes**
 
 Open [Base44.com](http://Base44.com) and click on Publish.
