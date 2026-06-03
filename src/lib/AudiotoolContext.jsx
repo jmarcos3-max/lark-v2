@@ -7,12 +7,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  AUDIOTOOL_CLIENT_ID,
-  AUDIOTOOL_SCOPE,
-  getAudiotoolRedirectUrl,
-} from '@/lib/audiotool-config';
 import { formatAuthError, getAudiotoolSetupIssues } from '@/lib/audiotool-setup';
+import {
+  initAudiotoolClient,
+  resetAudiotoolInit,
+  stripOAuthSearchParams,
+} from '@/lib/audiotool-init';
 
 const INIT_TIMEOUT_MS = 20_000;
 const AudiotoolContext = createContext(null);
@@ -26,6 +26,11 @@ export function AudiotoolProvider({ children }) {
   const startLoginRef = useRef(null);
   const pendingLoginRef = useRef(false);
   const initGenerationRef = useRef(0);
+  const clientRef = useRef(null);
+
+  useEffect(() => {
+    clientRef.current = client;
+  }, [client]);
 
   useEffect(() => {
     setSetupIssues(getAudiotoolSetupIssues());
@@ -34,11 +39,12 @@ export function AudiotoolProvider({ children }) {
   const applyAuthResult = useCallback((at) => {
     if (at.status === 'authenticated') {
       setClient(at);
-      setUserName(at.userName);
+      setUserName(at.userName ?? null);
       setStatus('authenticated');
       setError(null);
       startLoginRef.current = null;
       pendingLoginRef.current = false;
+      stripOAuthSearchParams();
       return;
     }
 
@@ -65,6 +71,10 @@ export function AudiotoolProvider({ children }) {
       return;
     }
 
+    if (clientRef.current?.status === 'authenticated') {
+      return;
+    }
+
     const generation = ++initGenerationRef.current;
     setStatus('loading');
     setError(null);
@@ -80,16 +90,12 @@ export function AudiotoolProvider({ children }) {
     }, INIT_TIMEOUT_MS);
 
     try {
-      const { audiotool } = await import('@audiotool/nexus');
-      const at = await audiotool({
-        clientId: AUDIOTOOL_CLIENT_ID,
-        redirectUrl: getAudiotoolRedirectUrl(),
-        scope: AUDIOTOOL_SCOPE,
-      });
+      const at = await initAudiotoolClient();
       if (initGenerationRef.current !== generation || timedOut) return;
       applyAuthResult(at);
     } catch (err) {
       if (initGenerationRef.current !== generation || timedOut) return;
+      resetAudiotoolInit();
       setStatus('unauthenticated');
       setError(err instanceof Error ? new Error(formatAuthError(err)) : new Error(String(err)));
       startLoginRef.current = null;
@@ -125,6 +131,7 @@ export function AudiotoolProvider({ children }) {
       return;
     }
 
+    resetAudiotoolInit();
     initSdk();
   }, [status, initSdk]);
 
@@ -132,10 +139,12 @@ export function AudiotoolProvider({ children }) {
     pendingLoginRef.current = false;
 
     if (client?.status === 'authenticated') {
+      resetAudiotoolInit();
       client.logout();
       return;
     }
 
+    resetAudiotoolInit();
     setClient(null);
     setUserName(null);
     setStatus('unauthenticated');

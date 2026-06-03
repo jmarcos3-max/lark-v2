@@ -19,9 +19,7 @@ function showBootError(message) {
 
 try {
   ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
+    <App />
   )
 } catch (error) {
   showBootError(error instanceof Error ? error.message : String(error))

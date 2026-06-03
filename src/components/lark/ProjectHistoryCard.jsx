@@ -150,12 +150,13 @@ export default function ProjectHistoryCard({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lark-scrollbar overflow-y-auto max-h-64">
-          {items.map((project) => {
+          {items.map((project, index) => {
             const date = timestampToDate(project.updateTime ?? project.createTime);
             const isActive = project.audiotoolName === activeProjectName;
+            const projectKey = project.audiotoolName ?? `project-${index}`;
             return (
               <button
-                key={project.audiotoolName}
+                key={projectKey}
                 type="button"
                 onClick={() => onOpenProject?.(project.audiotoolName)}
                 className="relative group rounded-xl p-3 flex flex-col gap-2 transition-all duration-200 text-left w-full"
