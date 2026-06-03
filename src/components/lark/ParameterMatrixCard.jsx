@@ -332,7 +332,7 @@ export default function ParameterMatrixCard({
           border: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        Lark transcribes your hum with Basic Pitch, then writes MIDI in Studio. Piano and Guitar use the Gakki soundfont player; Bass uses Bassline; Drums use Beatbox. The timeline track is labeled “Lark · Piano · …” — right-click Gakki in Studio to change the exact soundfont.
+        Lark transcribes your hum with Basic Pitch, then writes MIDI in Studio — did research on turning humming into an instrument, since ElevenLabs can&apos;t handle it. Piano and Guitar use the Gakki soundfont player; Bass uses Bassline; Drums use Beatbox. The timeline track is labeled “Lark · Piano · …” — right-click Gakki in Studio to change the exact soundfont.
       </p>
 
       <div className="flex-1" />
