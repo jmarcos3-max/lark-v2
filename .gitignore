@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.local
 
 # Logs
 /logs
@@ -16,6 +17,7 @@ node_modules
 dist
 dist-ssr
 *.local
+!.env.local
 
 # Editor directories and files
 .vscode/*

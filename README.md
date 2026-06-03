@@ -15,9 +15,9 @@ Any change pushed to the repo will also be reflected in the Base44 Builder.
 1. Clone the repository using the project's Git URL 
 2. Navigate to the project directory
 3. Install dependencies: `npm install`
-4. Copy env template and fill in values: `cp .env.example .env.local` (get real keys from the project owner — do not commit `.env.local`)
+4. Env is committed for the team as `.env.local` — pull latest and run `npm run dev`. To override locally, copy `.env.example` instead.
 
-See `.env.example` for all variables. Minimum for **transform flow**:
+See `.env.example` for variable descriptions. Minimum for **transform flow**:
 
 ```
 VITE_AUDIOTOOL_CLIENT_ID=your_audiotool_client_id
