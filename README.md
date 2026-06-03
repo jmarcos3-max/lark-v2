@@ -15,19 +15,20 @@ Any change pushed to the repo will also be reflected in the Base44 Builder.
 1. Clone the repository using the project's Git URL 
 2. Navigate to the project directory
 3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+4. Copy env template and fill in values: `cp .env.example .env.local` (get real keys from the project owner — do not commit `.env.local`)
+
+See `.env.example` for all variables. Minimum for **transform flow**:
+
+```
+VITE_AUDIOTOOL_CLIENT_ID=your_audiotool_client_id
+VITE_AUDIOTOOL_REDIRECT_URL=http://127.0.0.1:5173/
+```
+
+Optional Base44 (cloud audio upload):
 
 ```
 VITE_BASE44_APP_ID=your_app_id
 VITE_BASE44_APP_BASE_URL=your_backend_url
-
-# Audiotool Nexus (register at https://developer.audiotool.com/applications)
-VITE_AUDIOTOOL_CLIENT_ID=your_audiotool_client_id
-VITE_AUDIOTOOL_REDIRECT_URL=http://127.0.0.1:5173/
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 ```
 
 **Audiotool login** ([docs](https://developer.audiotool.com/js-package-documentation/documents/Authentication.html)):
