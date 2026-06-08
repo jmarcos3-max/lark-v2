@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useAudiotool } from '@/lib/AudiotoolContext';
 import { useTheme } from '@/lib/ThemeContext';
-import { LogOut, User, Sparkles, RefreshCw, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
+import { LogOut, User, RefreshCw, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
 
 // Minimalist Lark logomark — stylized bird wing / audio wave hybrid
 const LarkMark = () => (
@@ -175,15 +175,6 @@ export default function LarkNavbar({ isConnected }) {
             Studio
           </span>
         </div>
-      </div>
-
-      {/* Center tagline */}
-      <div className="hidden md:flex items-center gap-2" style={{ color: 'var(--lark-text-muted)' }}>
-        <Sparkles size={12} style={{ color: 'var(--lark-violet)' }} />
-        <span className="text-xs tracking-widest uppercase font-medium">
-          AI Audio Transformation Engine
-        </span>
-        <Sparkles size={12} style={{ color: 'var(--lark-violet)' }} />
       </div>
 
       {/* Right area */}
