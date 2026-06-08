@@ -3,15 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths-ignore:
-      - "docs/**"
-      - "assets/**"
-      - "index.html"
-      - "404.html"
-      - ".nojekyll"
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -22,11 +16,12 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,34 +35,28 @@ jobs:
       - name: Use dev entry HTML for Vite build
         run: cp index.dev.html index.html
 
-      - name: Build and sync Pages root files
+      - name: Build
         env:
           GITHUB_ACTIONS: true
           GITHUB_REPOSITORY: ${{ github.repository }}
           VITE_AUDIOTOOL_CLIENT_ID: ${{ secrets.VITE_AUDIOTOOL_CLIENT_ID }}
           VITE_ELEVENLABS_API_KEY: ${{ secrets.VITE_ELEVENLABS_API_KEY }}
-        run: npm run build:pages
+        run: npm run build
 
       - name: Verify production build
         run: |
           set -euo pipefail
-          test -f index.html
-          test -d assets
-          grep -qE 'assets/index-[^"]+\.js' index.html
-          ! grep -q '/src/main.jsx' index.html
-          echo "Pages root files ready"
+          test -f dist/index.html
+          test -d dist/assets
+          grep -qE 'assets/index-[^"]+\.js' dist/index.html
+          ! grep -q '/src/main.jsx' dist/index.html
+          echo "dist/ ready for Pages"
 
-      - name: Commit built site to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f index.html 404.html .nojekyll assets docs
-          git diff --staged --quiet || git commit -m "Deploy site to repo root [skip ci]"
-          git push origin HEAD:main
-
-      - name: Publish built site to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          force_orphan: true
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
