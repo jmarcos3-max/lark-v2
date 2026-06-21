@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "publish:lark-v2": "bash scripts/publish-lark-v2.sh"
+    "publish:lark": "bash scripts/publish-lark.sh"
   },
   "dependencies": {
     "@audiotool/nexus": "^0.0.17",
