@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Zap, Loader2, Save, Plus, RefreshCw, ExternalLink, Layers } from 'lucide-react';
 import { audiotoolProjectToLark } from '@/lib/lark-project-metadata';
-import { studioDeviceName, TARGET_INSTRUMENTS } from '@/lib/lark-instruments';
+import { studioDeviceName, TARGET_INSTRUMENTS, availableStudioLayers, WOW_PASS_LAYERS } from '@/lib/lark-instruments';
+import { MOOD_LAYERS_NAME } from '@/lib/lark-copy';
+import { openAudiotoolStudio } from '@/lib/open-audiotool-studio';
+import LarkStepLabel from '@/components/lark/LarkStepLabel';
 
 const MOODS = [
   { value: 'Calm', icon: '🌊' },
@@ -13,8 +16,12 @@ const MOODS = [
 export default function ParameterMatrixCard({
   instrument,
   mood,
+  studioLayers = [],
+  wowPassLayers = [],
   onInstrumentChange,
   onMoodChange,
+  onStudioLayerToggle,
+  onWowPassLayerToggle,
   onAutomate,
   onGenerateMoodLayers,
   onNewProject,
@@ -123,15 +130,22 @@ export default function ParameterMatrixCard({
   const busy = isProjectBusy || isProcessing;
   const hasConnectedProject = Boolean(activeProjectName);
   const connectedTitle = currentProject?.title || 'Untitled Track';
+  const layerOptions = availableStudioLayers(instrument);
 
-  const requirements = [
-  { key: 'audio', label: 'Humming recorded or imported', done: hasAudio },
-  { key: 'project', label: 'Audiotool project connected', done: hasConnectedProject },
-  { key: 'instrument', label: 'Instrument chosen', done: hasInstrument },
-  { key: 'mood', label: 'Mood chosen', done: hasMood },
-  ];
+  const transformBlockerMessage = () => {
+    if (!hasAudio) return 'Complete Step 1 first — record or import humming in Audio Capture.';
+    if (!hasConnectedProject) return 'Complete Step 2 — select an Audiotool project.';
+    if (!hasInstrument) return 'Complete Step 3 — choose a lead instrument.';
+    return null;
+  };
 
-  const allRequirementsMet = requirements.every((r) => r.done);
+  const wowPassBlockerMessage = () => {
+    const block = transformBlockerMessage();
+    if (block) return block;
+    if (!hasMood) return `Pick a mood in Step 6 for ${MOOD_LAYERS_NAME}.`;
+    if (!wowPassLayers.length) return `Select at least one ${MOOD_LAYERS_NAME} type to generate.`;
+    return null;
+  };
 
   const handleTransformClick = () => {
     if (busy || isProcessing) return;
@@ -141,9 +155,9 @@ export default function ParameterMatrixCard({
       return;
     }
 
-    const missing = requirements.filter((r) => !r.done).map((r) => r.label);
-    if (missing.length) {
-      onTransformHint?.(`Complete these first: ${missing.join(' · ')}`);
+    const hint = transformBlockerMessage();
+    if (hint) {
+      onTransformHint?.(hint);
       return;
     }
 
@@ -156,9 +170,9 @@ export default function ParameterMatrixCard({
       onLogin?.();
       return;
     }
-    const missing = requirements.filter((r) => !r.done).map((r) => r.label);
-    if (missing.length) {
-      onTransformHint?.(`Complete these first: ${missing.join(' · ')}`);
+    const hint = wowPassBlockerMessage();
+    if (hint) {
+      onTransformHint?.(hint);
       return;
     }
     onGenerateMoodLayers?.();
@@ -175,20 +189,26 @@ export default function ParameterMatrixCard({
       className="lark-card-glass rounded-2xl p-5 h-full flex flex-col"
       style={{ minHeight: '340px' }}
     >
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 mb-1">
         <div
           className="w-1.5 h-5 rounded-full"
           style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }}
         />
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
-          Parameter Matrix
+          Studio Workflow
         </span>
       </div>
+      <p className="text-[10px] mb-4 px-1" style={{ color: 'var(--lark-text-subtle)' }}>
+        Step 1 is Audio Capture (left). Complete steps 2–5 to write MIDI in Studio.
+      </p>
 
       <div className="mb-5">
-        <label className="block text-[10px] uppercase tracking-widest mb-2" style={{ color: 'var(--lark-text-subtle)' }}>
-          Connected project
-        </label>
+        <LarkStepLabel
+          step={2}
+          title="Select project"
+          done={hasConnectedProject}
+          className="mb-2.5"
+        />
         {!isAuthenticated ? (
           <button
             type="button"
@@ -236,6 +256,38 @@ export default function ParameterMatrixCard({
                 Nexus synced · {connectedTitle}
               </p>
             )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={openNameDialog}
+                disabled={busy}
+                className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'var(--lark-text-muted)',
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {isProjectBusy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                New Project
+              </button>
+              <button
+                type="button"
+                onClick={handleRefreshProjects}
+                disabled={busy || loadingList}
+                className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'var(--lark-text-muted)',
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw size={12} className={loadingList ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -253,11 +305,14 @@ export default function ParameterMatrixCard({
       )}
 
       <div className="mb-5">
-        <label className="block text-[10px] uppercase tracking-widest mb-2.5" style={{ color: 'var(--lark-text-subtle)' }}>
-          Target Instrument
-        </label>
+        <LarkStepLabel
+          step={3}
+          title="Select lead instrument"
+          done={hasInstrument}
+          className="mb-2.5"
+        />
         <div className="grid grid-cols-4 gap-2">
-          {TARGET_INSTRUMENTS.map(({ value, icon, supportsAudiotool, supportsElevenLabs }) => (
+          {TARGET_INSTRUMENTS.map(({ value, icon }) => (
             <button
               key={value}
               onClick={() => onInstrumentChange(value)}
@@ -283,26 +338,116 @@ export default function ParameterMatrixCard({
               >
                 {studioDeviceName(value)}
               </span>
-              <span
-                className="text-[8px] leading-tight opacity-70"
-                style={{ color: instrument === value ? 'var(--lark-violet-bright)' : 'var(--lark-text-subtle)' }}
-              >
-                {supportsAudiotool && supportsElevenLabs ? 'AT + 11L' : supportsAudiotool ? 'AT only' : '11L only'}
-              </span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="mb-5">
-        <label className="block text-[10px] uppercase tracking-widest mb-2.5" style={{ color: 'var(--lark-text-subtle)' }}>
-          Mood Profile
-        </label>
+        <LarkStepLabel
+          step={4}
+          title="Add Studio layers"
+          done={studioLayers.length > 0}
+          optional
+          className="mb-2.5"
+        />
+        {!instrument ? (
+          <p
+            className="text-[10px] px-2 py-2 rounded-lg"
+            style={{
+              color: 'var(--lark-text-subtle)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            Choose a lead instrument first.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {layerOptions.map(({ value, icon }) => {
+              const selected = studioLayers.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onStudioLayerToggle?.(value)}
+                  disabled={busy}
+                  className="flex flex-col items-center gap-1 py-2 px-1.5 rounded-xl text-[11px] font-medium transition-all duration-200"
+                  style={{
+                    background: selected
+                      ? 'rgba(56,189,248,0.12)'
+                      : 'rgba(255,255,255,0.03)',
+                    border: selected
+                      ? '1px solid rgba(56,189,248,0.4)'
+                      : '1px solid rgba(255,255,255,0.07)',
+                    color: selected ? '#7DD3FC' : 'var(--lark-text-muted)',
+                    opacity: busy ? 0.6 : 1,
+                  }}
+                >
+                  <span className="text-sm">{icon}</span>
+                  <span>{value}</span>
+                  <span
+                    className="text-[8px] opacity-70"
+                    style={{ color: selected ? '#7DD3FC' : 'var(--lark-text-subtle)' }}
+                  >
+                    {studioDeviceName(value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="mb-5">
+        <LarkStepLabel step={5} title="Transform to Studio" className="mb-2.5" />
+        <button
+          type="button"
+          onClick={handleTransformClick}
+          disabled={busy || isProcessing}
+          title={
+            transformBlockerMessage()
+              ? transformBlockerMessage()
+              : 'Transcribe your hum and write MIDI in your connected project'
+          }
+          className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 text-sm font-bold transition-all duration-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+          style={{
+            background: isProcessing
+              ? 'rgba(139,92,246,0.15)'
+              : 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+            border: '1px solid rgba(139,92,246,0.4)',
+            color: isProcessing ? 'var(--lark-violet-bright)' : '#fff',
+            boxShadow: isProcessing ? 'none' : '0 0 24px rgba(139,92,246,0.3), 0 4px 16px rgba(0,0,0,0.4)',
+          }}
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 size={15} className="animate-spin" />
+              <span>{transformStatus || 'Writing to Studio…'}</span>
+            </>
+          ) : (
+            <>
+              <Zap size={15} />
+              <span>Transform humming → instrument</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="mb-5">
+        <LarkStepLabel
+          step={6}
+          title={`${MOOD_LAYERS_NAME} (ElevenLabs)`}
+          done={hasMood && wowPassLayers.length > 0}
+          optional
+          className="mb-2.5"
+        />
         <div className="grid grid-cols-2 gap-2">
           {MOODS.map(({ value, icon }) => (
             <button
               key={value}
-              onClick={() => onMoodChange(value)}
+              type="button"
+              onClick={() => onMoodChange(mood === value ? null : value)}
               disabled={busy}
               className="flex items-center gap-2 py-2.5 px-3 rounded-xl text-xs font-medium transition-all duration-200"
               style={{
@@ -322,76 +467,81 @@ export default function ParameterMatrixCard({
             </button>
           ))}
         </div>
+        <p className="text-[10px] mt-3 mb-2 px-1" style={{ color: 'var(--lark-text-subtle)' }}>
+          {MOOD_LAYERS_NAME} types (MP3 — preview here, import to Studio)
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {WOW_PASS_LAYERS.map(({ value, icon }) => {
+            const selected = wowPassLayers.includes(value);
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onWowPassLayerToggle?.(value)}
+                disabled={busy}
+                className="flex flex-col items-center gap-1 py-2 px-1.5 rounded-xl text-[10px] font-medium transition-all duration-200"
+                style={{
+                  background: selected
+                    ? 'rgba(56,189,248,0.12)'
+                    : 'rgba(255,255,255,0.03)',
+                  border: selected
+                    ? '1px solid rgba(56,189,248,0.4)'
+                    : '1px solid rgba(255,255,255,0.07)',
+                  color: selected ? '#7DD3FC' : 'var(--lark-text-muted)',
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                <span className="text-sm">{icon}</span>
+                <span className="text-center leading-tight">{value}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerateLayersClick}
+          disabled={busy || isGeneratingMoodLayers}
+          title={wowPassBlockerMessage() ?? 'Generate ElevenLabs mood layers'}
+          className="w-full mt-2 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
+          style={{
+            background: 'rgba(139,92,246,0.12)',
+            border: '1px solid rgba(139,92,246,0.35)',
+            color: 'var(--lark-violet-bright)',
+          }}
+        >
+          {isGeneratingMoodLayers ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              <span>Generating {MOOD_LAYERS_NAME}…</span>
+            </>
+          ) : (
+            <>
+              <Layers size={14} />
+              <span>Generate {MOOD_LAYERS_NAME}</span>
+            </>
+          )}
+        </button>
       </div>
-
-      <p
-        className="text-[10px] leading-relaxed mb-3 px-2 py-2 rounded-lg"
-        style={{
-          color: 'var(--lark-text-subtle)',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        Lark transcribes your hum with Basic Pitch, then writes MIDI in Studio — did research on turning humming into an instrument, since ElevenLabs can&apos;t handle it. Piano and Guitar use the Gakki soundfont player; Bass uses Bassline; Drums use Beatbox. The timeline track is labeled “Lark · Piano · …” — right-click Gakki in Studio to change the exact soundfont.
-      </p>
 
       <div className="flex-1" />
 
-      <div className="flex gap-2 mb-2">
-        <button
-          type="button"
-          onClick={openNameDialog}
-          disabled={busy}
-          className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
-          style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: 'var(--lark-text-muted)',
-            opacity: busy ? 0.6 : 1,
-          }}
-          onMouseEnter={e => { if (!busy) { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; e.currentTarget.style.color = 'var(--lark-violet-bright)'; } }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--lark-text-muted)'; }}
-        >
-          {isProjectBusy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-          New Project
-        </button>
-        <button
-          type="button"
-          onClick={handleRefreshProjects}
-          disabled={busy || loadingList}
-          className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-200"
-          style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: 'var(--lark-text-muted)',
-            opacity: busy ? 0.6 : 1,
-          }}
-          onMouseEnter={e => { if (!busy) { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; e.currentTarget.style.color = 'var(--lark-violet-bright)'; } }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--lark-text-muted)'; }}
-        >
-          <RefreshCw size={12} className={loadingList ? 'animate-spin' : ''} />
-          Refresh list
-        </button>
-      </div>
-
       {currentProject?.dawUrl && (
-        <a
-          href={currentProject.dawUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="w-full mb-2 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-[10px] transition-all"
+        <button
+          type="button"
+          onClick={() => openAudiotoolStudio(currentProject.dawUrl)}
+          className="w-full mb-2 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-[10px] transition-all cursor-pointer"
           style={{ color: 'var(--lark-violet-bright)', border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.06)' }}
         >
           <ExternalLink size={11} />
           Open in Audiotool Studio
-        </a>
+        </button>
       )}
 
       <button
         onClick={handleSave}
         disabled={busy || savedMsg || !hasConnectedProject}
-        title={!hasConnectedProject ? 'Select a connected project first' : undefined}
-        className="w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold mb-2 transition-all duration-200"
+        title={!hasConnectedProject ? 'Complete Step 2 first' : undefined}
+        className="w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-200"
         style={{
           background: savedMsg ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
           border: savedMsg ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)',
@@ -405,74 +555,6 @@ export default function ParameterMatrixCard({
           <Save size={13} />
         )}
         {savedMsg ? 'Saved to Audiotool!' : 'Save Project'}
-      </button>
-
-      <ul className="mb-3 space-y-1">
-        {requirements.map(({ key, label, done }) => (
-          <li
-            key={key}
-            className="text-[10px] flex items-center gap-2 px-1"
-            style={{ color: done ? '#86efac' : 'var(--lark-text-subtle)' }}
-          >
-            <span aria-hidden>{done ? '✓' : '○'}</span>
-            <span>{label}</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        type="button"
-        onClick={handleTransformClick}
-        disabled={busy || isProcessing}
-        title={
-          allRequirementsMet
-            ? 'Transcribe your hum and write MIDI in your connected project'
-            : 'Click to see what is still needed'
-        }
-        className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 text-sm font-bold transition-all duration-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-        style={{
-          background: isProcessing
-            ? 'rgba(139,92,246,0.15)'
-            : 'linear-gradient(135deg, #7C3AED, #5B21B6)',
-          border: '1px solid rgba(139,92,246,0.4)',
-          color: isProcessing ? 'var(--lark-violet-bright)' : '#fff',
-          boxShadow: isProcessing ? 'none' : '0 0 24px rgba(139,92,246,0.3), 0 4px 16px rgba(0,0,0,0.4)',
-        }}
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 size={15} className="animate-spin" />
-            <span>{transformStatus || 'Writing to Studio…'}</span>
-          </>
-        ) : (
-          <>
-            <Zap size={15} />
-            <span>Transform humming → instrument</span>
-          </>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={handleGenerateLayersClick}
-        disabled={busy || isGeneratingMoodLayers}
-        className="w-full mt-2 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
-        style={{
-          background: 'rgba(139,92,246,0.12)',
-          border: '1px solid rgba(139,92,246,0.35)',
-          color: 'var(--lark-violet-bright)',
-        }}
-      >
-        {isGeneratingMoodLayers ? (
-          <>
-            <Loader2 size={14} className="animate-spin" />
-            <span>Generating wow pass…</span>
-          </>
-        ) : (
-          <>
-            <Layers size={14} />
-            <span>Generate wow pass (ElevenLabs)</span>
-          </>
-        )}
       </button>
 
       {showNameDialog && (

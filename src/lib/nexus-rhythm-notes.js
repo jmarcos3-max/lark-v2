@@ -1,13 +1,24 @@
 import { Ticks, secondsToTicks } from '@audiotool/nexus/utils';
 import {
   deviceLabel,
+  deviceNeedsNoteChainVoice,
+  isDrumInstrument,
+  layerDeviceLabel,
+  NEXUS_DEVICE_BY_INSTRUMENT,
+  noteChainVoiceType,
   nexusDeviceCreateOptions,
 } from '@/lib/lark-instruments';
-import { findLarkDevices } from '@/lib/nexus-instruments';
+import { adaptNotePlansForLayer } from '@/lib/lark-layer-notes';
+import {
+  findLarkDevices,
+  findLarkMixerChannels,
+  findLarkNoteTracks,
+} from '@/lib/nexus-instruments';
 import {
   ensureMixerChannelInTransaction,
   primeDeviceForPlayback,
   wireDeviceToMixerChannel,
+  wireNotesOutputToInput,
 } from '@/lib/nexus-mixer-routing';
 
 function fieldValue(field) {
@@ -45,12 +56,96 @@ function assertDocumentReady(nexusDoc) {
   }
 }
 
+function writeInstrumentTrack(t, {
+  instrument,
+  label,
+  notePlans,
+  orderAmongTracks,
+  slotIndex,
+  duration,
+}) {
+  const { deviceType, options: deviceOptions } = nexusDeviceCreateOptions(instrument, {
+    label,
+    positionX: 140 + (slotIndex % 3) * 240,
+    positionY: 180 + slotIndex * 120,
+  });
+
+  const collection = t.create('noteCollection', {});
+  const positionX = 140 + (slotIndex % 3) * 240;
+  const positionY = 180 + slotIndex * 120;
+
+  let notePlayer = null;
+  let audioDevice = null;
+  let notesCabled = true;
+
+  if (deviceNeedsNoteChainVoice(deviceType)) {
+    const voiceType = noteChainVoiceType(deviceType);
+    const midiDevice = t.create(deviceType, deviceOptions);
+    primeDeviceForPlayback(t, midiDevice);
+
+    const voice = t.create(voiceType, {
+      displayName: `${label} · Voice`,
+      positionX: positionX + 140,
+      positionY,
+      isActive: true,
+      gain: 0.7,
+    });
+    primeDeviceForPlayback(t, voice);
+
+    notesCabled = wireNotesOutputToInput(t, midiDevice, voice);
+    notePlayer = midiDevice;
+    audioDevice = voice;
+  } else {
+    const device = t.create(deviceType, deviceOptions);
+    primeDeviceForPlayback(t, device);
+    notePlayer = device;
+    audioDevice = device;
+  }
+
+  const track = t.create('noteTrack', {
+    player: notePlayer.location,
+    orderAmongTracks,
+  });
+
+  t.create('noteRegion', {
+    collection: collection.location,
+    track: track.location,
+    region: {
+      positionTicks: 0,
+      durationTicks: duration,
+      displayName: label,
+    },
+  });
+
+  const mixerChannel = ensureMixerChannelInTransaction(t, { stripLabel: label, forceNew: true });
+  const cabled = notesCabled && wireDeviceToMixerChannel(t, audioDevice, mixerChannel);
+
+  for (const plan of notePlans) {
+    t.create('note', {
+      collection: collection.location,
+      positionTicks: plan.positionTicks,
+      durationTicks: plan.durationTicks,
+      pitch: plan.pitch,
+      velocity: plan.velocity,
+    });
+  }
+
+  return { noteCount: notePlans.length, cabled, deviceType };
+}
+
 /**
- * Write MIDI note plans onto a Nexus instrument in the open project.
+ * Write MIDI note plans to a primary instrument plus optional Studio layers.
  */
-export async function applyNotesToInstrument(
+export async function applyNotesWithLayers(
   nexusDoc,
-  { instrument, mood, notePlans, regionDuration, bpm: bpmOverride },
+  {
+    instrument,
+    layers = [],
+    mood,
+    notePlans,
+    regionDuration,
+    bpm: bpmOverride,
+  },
 ) {
   assertDocumentReady(nexusDoc);
 
@@ -58,26 +153,31 @@ export async function applyNotesToInstrument(
     throw new Error('No notes to write. Try humming louder or closer to the mic.');
   }
 
-  const label = deviceLabel(instrument, mood);
   const bpm = bpmOverride ?? getProjectBpm(nexusDoc);
-
-  const { deviceType, options: deviceOptions } = nexusDeviceCreateOptions(instrument, {
-    label,
-    positionX: 140,
-    positionY: 200,
-  });
-
-  const existing = nexusDoc.queryEntities?.ofTypes(deviceType)?.get?.() ?? [];
-  const offset = (existing.length % 4) * 220;
-  const larkDevicesToRemove = findLarkDevices(nexusDoc);
-  const orderAmongTracks = nextTrackOrder(nexusDoc);
-
   const duration =
     regionDuration
     ?? Math.max(Ticks.Bars(1), secondsToTicks(8, bpm) + Ticks.Beat);
 
-  let noteCount = 0;
-  let cabled = false;
+  const larkDevicesToRemove = findLarkDevices(nexusDoc);
+  const larkNoteTracksToRemove = findLarkNoteTracks(nexusDoc);
+  const larkMixerChannelsToRemove = findLarkMixerChannels(nexusDoc);
+  let trackOrder = nextTrackOrder(nexusDoc);
+  let totalNoteCount = 0;
+  let allCabled = true;
+  const layersWritten = [];
+
+  const targets = [
+    {
+      instrument,
+      label: deviceLabel(instrument, mood),
+      plans: notePlans,
+    },
+    ...layers.map((layer) => ({
+      instrument: layer,
+      label: layerDeviceLabel(layer, mood),
+      plans: adaptNotePlansForLayer(notePlans, layer, instrument),
+    })),
+  ];
 
   await nexusDoc.modify((t) => {
     for (const entity of larkDevicesToRemove) {
@@ -87,55 +187,68 @@ export async function applyNotesToInstrument(
         // ignore stale entity
       }
     }
-
-    const collection = t.create('noteCollection', {});
-    const device = t.create(deviceType, {
-      ...deviceOptions,
-      positionX: deviceOptions.positionX + offset,
-    });
-
-    primeDeviceForPlayback(t, device);
-
-    const track = t.create('noteTrack', {
-      player: device.location,
-      orderAmongTracks,
-    });
-
-    t.create('noteRegion', {
-      collection: collection.location,
-      track: track.location,
-      region: {
-        positionTicks: 0,
-        durationTicks: duration,
-        displayName: label,
-      },
-    });
-
-    const mixerChannel = ensureMixerChannelInTransaction(t);
-    cabled = wireDeviceToMixerChannel(t, device, mixerChannel);
-
-    for (const plan of notePlans) {
-      t.create('note', {
-        collection: collection.location,
-        positionTicks: plan.positionTicks,
-        durationTicks: plan.durationTicks,
-        pitch: plan.pitch,
-        velocity: plan.velocity,
-      });
-      noteCount += 1;
+    for (const entity of larkNoteTracksToRemove) {
+      try {
+        t.removeWithDependencies(entity);
+      } catch {
+        // ignore stale entity
+      }
     }
+    for (const entity of larkMixerChannelsToRemove) {
+      try {
+        t.removeWithDependencies(entity);
+      } catch {
+        // ignore stale entity
+      }
+    }
+
+    targets.forEach((target, index) => {
+      const result = writeInstrumentTrack(t, {
+        instrument: target.instrument,
+        label: target.label,
+        notePlans: target.plans,
+        orderAmongTracks: trackOrder,
+        slotIndex: index,
+        duration,
+      });
+      trackOrder += 1;
+      totalNoteCount += result.noteCount;
+      allCabled = allCabled && result.cabled;
+      if (index > 0) layersWritten.push(target.instrument);
+    });
   });
 
-  if (!cabled) {
+  if (!allCabled) {
     throw new Error(
-      'Notes were added but the instrument is not wired to Master. Cable the instrument output to a free socket on the Master stagebox.',
+      'Notes were added but one or more instruments are not wired to Master. Cable outputs to free sockets on the Master stagebox.',
     );
   }
 
-  return { noteCount, bpm, cabled, deviceType };
+  return {
+    noteCount: totalNoteCount,
+    leadNoteCount: notePlans.length,
+    layerCount: layersWritten.length,
+    layersWritten,
+    bpm,
+    cabled: allCabled,
+    deviceType: NEXUS_DEVICE_BY_INSTRUMENT[instrument] ?? 'gakki',
+  };
 }
 
-/** @deprecated Use applyNotesToInstrument after transcribeHumToNotes */
+/** @deprecated Use applyNotesWithLayers */
+export async function applyNotesToInstrument(nexusDoc, options) {
+  const { instrument, mood, notePlans, regionDuration, bpm } = options;
+  return applyNotesWithLayers(nexusDoc, {
+    instrument,
+    layers: [],
+    mood,
+    notePlans,
+    regionDuration,
+    bpm,
+  });
+}
+
+/** @deprecated Use applyNotesWithLayers after transcribeHumToNotes */
 export async function applyRhythmToInstrument(nexusDoc, { instrument, mood, rhythm }) {
   const bpm = rhythm.bpm ?? getProjectBpm(nexusDoc);
   const notePlans = rhythm.onsets.map((onset, index) => {
@@ -144,7 +257,7 @@ export async function applyRhythmToInstrument(nexusDoc, { instrument, mood, rhyt
       Math.round(secondsToTicks(onset.timeSec, bpm) / Ticks.SemiQuaver) * Ticks.SemiQuaver,
     );
     let pitch = 60;
-    if (instrument === 'Drums') pitch = index % 4 === 0 ? 36 : index % 2 ? 38 : 42;
+    if (isDrumInstrument(instrument)) pitch = index % 4 === 0 ? 36 : index % 2 ? 38 : 42;
     return {
       positionTicks,
       durationTicks: Math.round(Ticks.SemiQuaver * 0.85),
@@ -152,8 +265,9 @@ export async function applyRhythmToInstrument(nexusDoc, { instrument, mood, rhyt
       velocity: 0.35 + onset.strength * 0.55,
     };
   });
-  return applyNotesToInstrument(nexusDoc, {
+  return applyNotesWithLayers(nexusDoc, {
     instrument,
+    layers: [],
     mood,
     notePlans,
     bpm,

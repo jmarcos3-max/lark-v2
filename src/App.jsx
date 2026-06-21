@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
+import { AccessibilityProvider } from '@/lib/AccessibilityContext';
 import { AudiotoolProvider } from '@/lib/AudiotoolContext';
 import Lark from './pages/Lark';
 
@@ -88,6 +89,7 @@ function App() {
   return (
     <AppErrorBoundary>
       <ThemeProvider>
+        <AccessibilityProvider>
         <AuthProvider>
           <AudiotoolProvider>
             <QueryClientProvider client={queryClientInstance}>
@@ -102,6 +104,7 @@ function App() {
             </QueryClientProvider>
           </AudiotoolProvider>
         </AuthProvider>
+        </AccessibilityProvider>
       </ThemeProvider>
     </AppErrorBoundary>
   );

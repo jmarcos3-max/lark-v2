@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { formatAuthError, getAudiotoolSetupIssues } from '@/lib/audiotool-setup';
+import { markAudiotoolScopeGranted } from '@/lib/audiotool-scope';
 import {
   initAudiotoolClient,
   resetAudiotoolInit,
@@ -42,6 +43,8 @@ export function AudiotoolProvider({ children }) {
       setUserName(at.userName ?? null);
       setStatus('authenticated');
       setError(null);
+      markAudiotoolScopeGranted();
+      setSetupIssues(getAudiotoolSetupIssues());
       startLoginRef.current = null;
       pendingLoginRef.current = false;
       stripOAuthSearchParams();

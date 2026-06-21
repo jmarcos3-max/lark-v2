@@ -1,7 +1,10 @@
 /** OAuth redirect must match developer.audiotool.com app settings exactly (incl. trailing slash). */
 export const AUDIOTOOL_CLIENT_ID = import.meta.env.VITE_AUDIOTOOL_CLIENT_ID ?? '';
 
-export const AUDIOTOOL_SCOPE = import.meta.env.VITE_AUDIOTOOL_SCOPE ?? 'project:write';
+/** Space-separated scopes — project:write for MIDI; sample:write for Mood layers import. */
+export const AUDIOTOOL_SCOPE = (
+  import.meta.env.VITE_AUDIOTOOL_SCOPE ?? 'project:write sample:write'
+).trim();
 
 function normalizeRedirectUrl(url) {
   return url.endsWith('/') ? url : `${url}/`;

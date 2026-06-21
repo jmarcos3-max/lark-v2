@@ -5,6 +5,8 @@ import {
 import {
   buildElevenLabsLayerPrompt,
   buildElevenLabsMusicPrompt,
+  defaultWowPassLayerTypes,
+  wowPassLayerDurationMs,
 } from '@/lib/lark-instruments';
 
 function apiHeaders() {
@@ -147,11 +149,14 @@ async function composeLayerFromPrompt(prompt, durationMs) {
     throw new Error(`ElevenLabs (${res.status}): ${detail}`);
   }
 
-  const blob = await res.blob();
-  if (!blob.size) {
+  const raw = await res.blob();
+  if (!raw.size) {
     throw new Error('ElevenLabs returned empty layer audio.');
   }
-  return blob;
+  if (raw.type && raw.type !== 'application/octet-stream') {
+    return raw;
+  }
+  return new Blob([raw], { type: 'audio/mpeg' });
 }
 
 export async function composeMoodLayers({
@@ -159,24 +164,21 @@ export async function composeMoodLayers({
   mood,
   bpm,
   durationMs,
-  layerTypes = ['hook double', 'riser', 'impact'],
+  humContext,
+  layerTypes = defaultWowPassLayerTypes(),
 }) {
-  const durationByType = {
-    'hook double': Math.min(Math.max(durationMs * 0.9, 6000), 22000),
-    riser: 5000,
-    impact: 3000,
-  };
   const layers = [];
   for (const layerType of layerTypes) {
     const prompt = buildElevenLabsLayerPrompt({
       instrument,
       mood,
       layerType,
-      bpm,
+      bpm: humContext?.bpm ?? bpm,
+      humContext,
     });
     const blob = await composeLayerFromPrompt(
       prompt,
-      durationByType[layerType] ?? durationMs,
+      wowPassLayerDurationMs(layerType, durationMs),
     );
     layers.push({
       id: `${Date.now()}-${layerType.replace(/\s+/g, '-')}`,

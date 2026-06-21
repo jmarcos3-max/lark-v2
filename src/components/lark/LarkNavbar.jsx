@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useAudiotool } from '@/lib/AudiotoolContext';
-import { useTheme } from '@/lib/ThemeContext';
-import { LogOut, User, RefreshCw, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
+import AppearanceMenu from '@/components/lark/AppearanceMenu';
+import { LogOut, User, RefreshCw, Loader2 } from 'lucide-react';
 
-// Minimalist Lark logomark — stylized bird wing / audio wave hybrid
 const LarkMark = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M2 13 Q5 4 9 5 Q13 6 10 10 Q8 13 11 14 Q14 15 16 11" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
@@ -12,68 +11,7 @@ const LarkMark = () => (
   </svg>
 );
 
-const THEME_OPTIONS = [
-  { value: 'day',    label: 'Day',    Icon: Sun },
-  { value: 'night',  label: 'Night',  Icon: Moon },
-  { value: 'system', label: 'System', Icon: Monitor },
-];
-
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [open, setOpen] = useState(false);
-  const active = THEME_OPTIONS.find(t => t.value === theme);
-  const ActiveIcon = active?.Icon || Moon;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(v => !v)}
-        title="Toggle theme"
-        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200"
-        style={{
-          background: open ? 'rgba(139,92,246,0.15)' : 'rgba(128,128,128,0.08)',
-          border: `1px solid ${open ? 'rgba(139,92,246,0.4)' : 'var(--lark-border)'}`,
-          color: open ? 'var(--lark-violet-bright)' : 'var(--lark-text-muted)',
-        }}
-      >
-        <ActiveIcon size={13} />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
-            className="absolute right-0 top-full mt-2 rounded-xl overflow-hidden z-50"
-            style={{
-              background: 'var(--lark-card)',
-              border: '1px solid var(--lark-border)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-              minWidth: '130px',
-            }}
-          >
-            {THEME_OPTIONS.map(({ value, label, Icon }) => (
-              <button
-                key={value}
-                onClick={() => { setTheme(value); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-all"
-                style={{
-                  color: theme === value ? 'var(--lark-violet-bright)' : 'var(--lark-text-muted)',
-                  background: theme === value ? 'rgba(139,92,246,0.1)' : 'transparent',
-                }}
-                onMouseEnter={e => { if (theme !== value) e.currentTarget.style.background = 'rgba(128,128,128,0.06)'; }}
-                onMouseLeave={e => { if (theme !== value) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <Icon size={12} />
-                {label}
-                {theme === value && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+export { default as ThemeToggle } from '@/components/lark/AppearanceMenu';
 
 function AudiotoolLoginButton() {
   const { login, isLoading, error, setupIssues } = useAudiotool();
@@ -122,7 +60,6 @@ export default function LarkNavbar({ isConnected }) {
   const { userName, isAuthenticated, logout: logoutAudiotool } = useAudiotool();
   const nexusConnected = isConnected ?? isAuthenticated;
   const displayName = userName || user?.full_name || user?.email;
-  const { resolvedTheme } = useTheme();
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSignOut = () => {
@@ -186,8 +123,8 @@ export default function LarkNavbar({ isConnected }) {
 
       {/* Right area */}
       <div className="flex items-center gap-2">
-        {/* Theme toggle */}
-        <ThemeToggle />
+        {/* Appearance & accessibility */}
+        <AppearanceMenu />
 
         {isAuthenticated || user ? (
           <div className="flex items-center gap-2">

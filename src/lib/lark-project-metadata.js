@@ -1,3 +1,5 @@
+import { defaultWowPassLayerTypes, sanitizeWowPassLayers } from '@/lib/lark-instruments';
+
 const LARK_META_PREFIX = 'lark-meta:';
 
 /** Encode Lark session fields into an Audiotool project description. */
@@ -6,6 +8,8 @@ export function encodeLarkMetadata({
   target_instrument,
   selected_mood,
   elevenlabs_output_url,
+  studio_layers,
+  wow_pass_layers,
 }) {
   return LARK_META_PREFIX
     + JSON.stringify({
@@ -13,6 +17,8 @@ export function encodeLarkMetadata({
       target_instrument: target_instrument ?? null,
       selected_mood: selected_mood ?? null,
       elevenlabs_output_url: elevenlabs_output_url ?? null,
+      studio_layers: studio_layers ?? [],
+      wow_pass_layers: wow_pass_layers ?? defaultWowPassLayerTypes(),
     });
 }
 
@@ -55,6 +61,10 @@ export function audiotoolProjectToLark(project) {
     target_instrument: meta?.target_instrument ?? null,
     selected_mood: meta?.selected_mood ?? null,
     elevenlabs_output_url: meta?.elevenlabs_output_url ?? null,
+    studio_layers: meta?.studio_layers ?? [],
+    wow_pass_layers: sanitizeWowPassLayers(
+      meta?.wow_pass_layers ?? defaultWowPassLayerTypes(),
+    ),
     createTime: project?.createTime,
     updateTime: project?.updateTime,
   };
@@ -68,6 +78,8 @@ export const emptyLarkProject = () => ({
   target_instrument: null,
   selected_mood: null,
   elevenlabs_output_url: null,
+  studio_layers: [],
+  wow_pass_layers: defaultWowPassLayerTypes(),
   createTime: null,
   updateTime: null,
 });

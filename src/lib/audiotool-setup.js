@@ -3,6 +3,10 @@ import {
   AUDIOTOOL_SCOPE,
   getAudiotoolRedirectUrl,
 } from '@/lib/audiotool-config';
+import {
+  audiotoolScopeIncludes,
+  audiotoolScopeNeedsRefresh,
+} from '@/lib/audiotool-scope';
 
 /** Checks Lark config against https://developer.audiotool.com/js-package-documentation/ */
 export function getAudiotoolSetupIssues() {
@@ -17,10 +21,26 @@ export function getAudiotoolSetupIssues() {
     });
   }
 
-  if (AUDIOTOOL_SCOPE !== 'project:write') {
+  if (!AUDIOTOOL_SCOPE.includes('project:write')) {
     issues.push({
       level: 'warn',
-      message: `Scope is "${AUDIOTOOL_SCOPE}"; docs recommend project:write for project sync.`,
+      message: `Scope is "${AUDIOTOOL_SCOPE}"; project:write is required for Studio transform.`,
+    });
+  }
+
+  if (!audiotoolScopeIncludes('sample:write')) {
+    issues.push({
+      level: 'warn',
+      message:
+        'Mood layers import needs sample:write in VITE_AUDIOTOOL_SCOPE (e.g. "project:write sample:write").',
+    });
+  }
+
+  if (audiotoolScopeNeedsRefresh()) {
+    issues.push({
+      level: 'warn',
+      message:
+        'Audiotool scopes changed — sign out and sign in again so Mood layers import can upload samples.',
     });
   }
 

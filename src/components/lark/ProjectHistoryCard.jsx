@@ -14,6 +14,10 @@ const INSTRUMENT_COLORS = {
   Bass: { bg: 'rgba(236,72,153,0.12)', border: 'rgba(236,72,153,0.3)', text: '#F9A8D4' },
   Drums: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', text: '#FCD34D' },
   Guitar: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)', text: '#6EE7B7' },
+  Pad: { bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.25)', text: '#7DD3FC' },
+  Arp: { bg: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.28)', text: '#F9A8D4' },
+  Synth: { bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.3)', text: '#C4B5FD' },
+  '909': { bg: 'rgba(234,88,12,0.12)', border: 'rgba(234,88,12,0.28)', text: '#FDBA74' },
 };
 const DEFAULT_INSTRUMENT_COLORS = {
   bg: 'rgba(139,92,246,0.12)',

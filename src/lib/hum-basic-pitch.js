@@ -7,6 +7,7 @@ import {
 import { Ticks, secondsToTicks } from '@audiotool/nexus/utils';
 import basicPitchModelUrl from '@spotify/basic-pitch/model/model.json?url';
 import { analyzeRhythmFromBlob } from '@/lib/hum-rhythm';
+import { isDrumInstrument } from '@/lib/lark-instruments';
 
 const BASIC_PITCH_SAMPLE_RATE = 22050;
 const MAX_TRANSCRIBE_SEC = 45;
@@ -69,7 +70,7 @@ function adaptNoteForInstrument(note, instrument, mood, bpm) {
   let pitch = Math.round(note.pitchMidi);
   let velocity = Math.min(1, Math.max(0.25, note.amplitude ?? 0.6));
 
-  if (instrument === 'Drums') {
+  if (isDrumInstrument(instrument)) {
     if (pitch < 45) pitch = 36;
     else if (pitch < 55) pitch = 38;
     else pitch = 42;
@@ -178,7 +179,7 @@ export async function transcribeHumToNotes(blob, { instrument, mood, onProgress 
       const velocity = 0.35 + onset.strength * 0.55;
       const durationTicks = Math.round(Ticks.SemiQuaver * 0.85);
       let pitch = 60;
-      if (instrument === 'Drums') pitch = index % 4 === 0 ? 36 : index % 2 ? 38 : 42;
+      if (isDrumInstrument(instrument)) pitch = index % 4 === 0 ? 36 : index % 2 ? 38 : 42;
       else if (instrument === 'Bass') pitch = 40;
       else if (instrument === 'Guitar') pitch = 67;
       if (mood === 'Melancholic') pitch -= 3;

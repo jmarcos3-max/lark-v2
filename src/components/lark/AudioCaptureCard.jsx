@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, FileAudio, CheckCircle, Play, Pause, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { appParams } from '@/lib/app-params';
+import LarkStepLabel from '@/components/lark/LarkStepLabel';
 
 const UPLOAD_TIMEOUT_MS = 25_000;
 const RECORD_TIMESLICE_MS = 100;
@@ -21,6 +23,10 @@ function extensionForMime(mimeType) {
   if (mimeType.includes('mp4')) return 'mp4';
   if (mimeType.includes('ogg')) return 'ogg';
   return 'webm';
+}
+
+function isBase44UploadEnabled() {
+  return Boolean(appParams.appId && appParams.appBaseUrl);
 }
 
 async function uploadToCloud(file) {
@@ -329,6 +335,11 @@ export default function AudioCaptureCard({ onAudioReady, importedAudio }) {
     setCapturedFileName(displayName);
     onAudioReady(localUrl, { name: displayName, blob, saveToLibrary: true });
 
+    if (!isBase44UploadEnabled()) {
+      captureBusyRef.current = false;
+      return;
+    }
+
     setIsSyncingCloud(true);
     try {
       const cloudUrl = await uploadToCloud(fileForUpload);
@@ -483,18 +494,18 @@ export default function AudioCaptureCard({ onAudioReady, importedAudio }) {
   if (capturedAudioUrl) {
     return (
       <div className="lark-card-glass rounded-2xl p-5 h-full flex flex-col" style={{ minHeight: '340px' }}>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }} />
-          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
-            Audio Capture
-          </span>
-          <div className="ml-auto flex items-center gap-1.5 text-[10px]" style={{ color: '#86efac' }}>
-            <CheckCircle size={11} style={{ color: '#4ade80' }} />
-            {capturedFileName}
-            {isSyncingCloud && (
-              <span style={{ color: 'var(--lark-violet-bright)' }}> · syncing…</span>
-            )}
-          </div>
+        <LarkStepLabel
+          step={1}
+          title="Hum or import audio"
+          done
+          className="mb-4"
+        />
+        <div className="flex items-center gap-1.5 text-[10px] mb-2 justify-end" style={{ color: '#86efac' }}>
+          <CheckCircle size={11} style={{ color: '#4ade80' }} />
+          {capturedFileName}
+          {isSyncingCloud && (
+            <span style={{ color: 'var(--lark-violet-bright)' }}> · syncing…</span>
+          )}
         </div>
         {uploadError && (
           <p className="text-[10px] mb-2 leading-snug" style={{ color: '#fbbf24' }}>
@@ -523,13 +534,12 @@ export default function AudioCaptureCard({ onAudioReady, importedAudio }) {
   // === INITIAL / RECORDING STATE ===
   return (
     <div className="lark-card-glass rounded-2xl p-5 h-full flex flex-col" style={{ minHeight: '340px' }}>
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }} />
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
-          Audio Capture
-        </span>
-      </div>
+      <LarkStepLabel
+        step={1}
+        title="Hum or import audio"
+        done={Boolean(importedAudio?.url)}
+        className="mb-5"
+      />
 
       {/* Mic Button */}
       <div className="flex flex-col items-center justify-center flex-1 gap-4">

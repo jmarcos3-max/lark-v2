@@ -5,10 +5,12 @@ import RawAudioLibraryCard from '@/components/lark/RawAudioLibraryCard';
 import MoodLayersCard from '@/components/lark/MoodLayersCard';
 import { listRawAudioEntries } from '@/lib/raw-audio-library';
 
+import { MOOD_LAYERS_NAME } from '@/lib/lark-copy';
+
 const TABS = [
   { id: 'projects', label: 'Audiotool Projects' },
   { id: 'raw', label: 'Raw Audio' },
-  { id: 'layers', label: 'Wow Pass' },
+  { id: 'layers', label: MOOD_LAYERS_NAME },
 ];
 
 export default function ProjectLibraryPanel(props) {
@@ -93,7 +95,6 @@ export default function ProjectLibraryPanel(props) {
           layers={props.moodLayers}
           isGenerating={props.isGeneratingMoodLayers}
           onGenerate={props.onGenerateMoodLayers}
-          onUseLayer={props.onUseMoodLayer}
         />
       )}
     </div>

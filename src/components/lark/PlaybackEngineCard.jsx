@@ -1,193 +1,215 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, Volume2, AudioWaveform, Loader2 } from 'lucide-react';
+import { MOOD_LAYERS_NAME, MOOD_LAYERS_PREVIEW_TITLE } from '@/lib/lark-copy';
+import {
+  Play,
+  Pause,
+  SkipBack,
+  Volume2,
+  AudioWaveform,
+  Loader2,
+  ExternalLink,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+import { openAudiotoolStudio } from '@/lib/open-audiotool-studio';
+import { useWowPassPreview } from '@/lib/useWowPassPreview';
+import { downloadMoodLayers, moodLayerDownloadHint } from '@/lib/download-mood-layers';
+import React, { useState } from 'react';
 
-const NexusVisualizer = ({ isPlaying }) => {
-  const bars = Array.from({ length: 32 }, (_, i) => i);
+function PreviewVisualizer({ levels, isPlaying, isGenerating }) {
+  const bars = levels?.length ? levels : Array.from({ length: 32 }, (_, i) => (
+    0.12 + Math.abs(Math.sin(i * 0.55)) * 0.18
+  ));
+
   return (
     <div className="flex items-end justify-center gap-0.5 h-12 w-full px-2">
-      {bars.map((i) => {
-        const baseH = 15 + Math.sin(i * 0.7) * 20 + Math.cos(i * 0.4) * 15;
+      {bars.map((level, i) => {
+        const h = isPlaying
+          ? Math.max(8, level * 100)
+          : Math.max(4, 15 + Math.sin(i * 0.7) * 12);
         return (
           <div
             key={i}
             className={`rounded-sm flex-1 transition-all ${isPlaying ? 'wave-bar' : ''}`}
             style={{
-              height: `${Math.max(4, baseH)}%`,
-              background: `linear-gradient(to top, rgba(139,92,246,0.8), rgba(167,139,250,0.3))`,
-              '--dur': `${0.4 + (i % 7) * 0.08}s`,
-              animationDelay: `${(i % 5) * 0.06}s`,
+              height: `${h}%`,
+              background: isGenerating
+                ? 'linear-gradient(to top, rgba(56,189,248,0.7), rgba(125,211,252,0.25))'
+                : 'linear-gradient(to top, rgba(139,92,246,0.85), rgba(167,139,250,0.35))',
+              '--dur': `${0.35 + (i % 7) * 0.07}s`,
+              animationDelay: `${(i % 5) * 0.05}s`,
               transformOrigin: 'bottom',
-              opacity: isPlaying ? 1 : 0.35,
+              opacity: isPlaying || isGenerating ? 1 : 0.35,
             }}
           />
         );
       })}
     </div>
   );
-};
+}
 
-export default function PlaybackEngineCard({ outputUrl, isProcessing }) {
-  const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
+function formatTime(seconds) {
+  if (!seconds || Number.isNaN(seconds)) return '0:00';
+  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+}
 
-  useEffect(() => {
-    if (!outputUrl) return;
-    setIsPlaying(false);
-    setCurrentTime(0);
-  }, [outputUrl]);
+export default function PlaybackEngineCard({
+  moodLayers = [],
+  isGeneratingMoodLayers = false,
+  isProcessing = false,
+  isImportingWowLayers = false,
+  wowImportStatus = null,
+  onImportToStudio,
+  dawUrl,
+}) {
+  const [downloadMsg, setDownloadMsg] = useState(null);
+  const {
+    tracks,
+    isPlaying,
+    currentTime,
+    duration,
+    loading,
+    loadError,
+    meterLevels,
+    togglePlay,
+    seek,
+    setTrackVolume,
+    toggleTrackEnabled,
+    hasAudio,
+  } = useWowPassPreview({ moodLayers });
 
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleSeek = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const pct = x / rect.width;
-    const newTime = pct * (duration || 0);
-    if (audioRef.current) audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
-  const restart = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
-    }
-  };
-
-  const formatTime = (s) => {
-    if (!s || isNaN(s)) return '0:00';
-    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  };
-
+  const isGenerating = isGeneratingMoodLayers || isProcessing;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const layerCount = moodLayers.length;
+
+  const handleDownloadLayers = () => {
+    const count = downloadMoodLayers(moodLayers);
+    if (count > 0) {
+      setDownloadMsg(moodLayerDownloadHint());
+      setTimeout(() => setDownloadMsg(null), 5000);
+    }
+  };
 
   return (
     <div
       className="lark-card-glass rounded-2xl p-5 h-full flex flex-col"
       style={{ minHeight: '340px' }}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div
             className="w-1.5 h-5 rounded-full"
-            style={{ background: 'linear-gradient(to bottom, #8B5CF6, #4C1D95)' }}
+            style={{ background: 'linear-gradient(to bottom, #38BDF8, #7C3AED)' }}
           />
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--lark-text-muted)' }}>
-            Playback Engine
+            {MOOD_LAYERS_PREVIEW_TITLE}
           </span>
         </div>
         <div
-          className="text-[9px] font-mono px-2 py-1 rounded-md uppercase tracking-wider"
+          className="text-[9px] font-mono px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1"
           style={{
-            background: 'rgba(139,92,246,0.1)',
-            color: 'rgba(139,92,246,0.7)',
-            border: '1px solid rgba(139,92,246,0.2)',
+            background: 'rgba(56,189,248,0.1)',
+            color: 'rgba(125,211,252,0.9)',
+            border: '1px solid rgba(56,189,248,0.25)',
           }}
         >
-          Nexus SDK
+          <Sparkles size={9} />
+          ElevenLabs
         </div>
       </div>
 
-      {/* Audiotool Nexus SDK Viewport */}
       <div
-        id="audiotool-nexus-sdk-viewport"
-        className="flex-1 rounded-xl flex flex-col overflow-hidden"
+        className="flex-1 rounded-xl flex flex-col overflow-hidden relative"
         style={{
           background: 'var(--lark-card)',
           border: '1px solid var(--lark-border)',
-          position: 'relative',
         }}
       >
-        {/* Viewport label */}
         <div
           className="px-3 py-2 flex items-center gap-1.5"
           style={{ borderBottom: '1px solid var(--lark-border)' }}
         >
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#8B5CF6' }} />
-          <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: 'rgba(139,92,246,0.6)' }}>
-            Audiotool Nexus SDK Viewport
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#38BDF8' }} />
+          <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: 'rgba(125,211,252,0.75)' }}>
+            {layerCount
+              ? `${layerCount} layer${layerCount > 1 ? 's' : ''}`
+              : 'No layers yet'}
           </span>
-          {isProcessing && (
-            <Loader2 size={9} className="animate-spin ml-auto" style={{ color: '#8B5CF6' }} />
+          {(loading || isGenerating) && (
+            <Loader2 size={9} className="animate-spin ml-auto" style={{ color: '#38BDF8' }} />
           )}
         </div>
 
-        {/* Visualizer area */}
-        <div className="flex-1 flex flex-col items-center justify-center px-3 py-4 gap-3">
-          {isProcessing ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-0.5 rounded-full wave-bar"
-                    style={{
-                      height: '24px',
-                      background: 'linear-gradient(to top, #7C3AED, #A78BFA)',
-                      '--dur': `${0.4 + i * 0.1}s`,
-                      animationDelay: `${i * 0.07}s`,
-                      transformOrigin: 'bottom',
-                    }}
-                  />
-                ))}
-              </div>
-              <p className="text-[10px]" style={{ color: 'rgba(139,92,246,0.7)' }}>
-                Synthesizing via Nexus...
-              </p>
-            </div>
-          ) : (
-            <NexusVisualizer isPlaying={isPlaying} />
+        <div className="flex-1 flex flex-col px-3 py-3 gap-3 min-h-0">
+          <PreviewVisualizer
+            levels={meterLevels}
+            isPlaying={isPlaying}
+            isGenerating={isGeneratingMoodLayers}
+          />
+
+          {loadError && (
+            <p className="text-[10px] text-center" style={{ color: '#f87171' }}>{loadError}</p>
           )}
 
-          {/* Timeline */}
-          <div className="w-full px-1">
+          {!hasAudio && !loading && !isGenerating && (
+            <p className="text-[10px] text-center leading-relaxed" style={{ color: 'var(--lark-text-subtle)' }}>
+              Generate {MOOD_LAYERS_NAME} in Step 6 to preview ElevenLabs layers here.
+            </p>
+          )}
+
+          {tracks.length > 0 && (
+            <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+              {tracks.map((track) => (
+                <div
+                  key={track.id}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5"
+                  style={{
+                    background: track.enabled ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    opacity: track.enabled ? 1 : 0.5,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleTrackEnabled(track.id)}
+                    className="text-[9px] font-mono uppercase w-14 shrink-0 text-left truncate"
+                    style={{ color: '#7DD3FC' }}
+                    title={track.enabled ? 'Mute track' : 'Unmute track'}
+                  >
+                    {track.label}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={track.volume}
+                    onChange={(e) => setTrackVolume(track.id, parseFloat(e.target.value))}
+                    className="flex-1 h-1 accent-violet-500 cursor-pointer min-w-0"
+                    disabled={!track.enabled}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="w-full px-1 mt-auto">
             <div
               className="w-full h-1.5 rounded-full cursor-pointer relative overflow-hidden"
               style={{ background: 'var(--lark-border-hover)' }}
-              onClick={handleSeek}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pct = (e.clientX - rect.left) / rect.width;
+                seek(pct * (duration || 0));
+              }}
             >
-              {/* Animated idle shimmer when no track */}
-              {!outputUrl && !isProcessing && (
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.3), transparent)',
-                    animation: 'shimmer 2s infinite',
-                  }}
-                />
-              )}
-              {/* Progress bar */}
               <div
                 className="h-full rounded-full transition-all duration-200"
                 style={{
                   width: `${progress}%`,
-                  background: 'linear-gradient(90deg, #7C3AED, #A78BFA)',
-                  boxShadow: progress > 0 ? '0 0 8px rgba(139,92,246,0.5)' : 'none',
+                  background: 'linear-gradient(90deg, #38BDF8, #A78BFA)',
+                  boxShadow: progress > 0 ? '0 0 8px rgba(56,189,248,0.45)' : 'none',
                 }}
               />
-              {/* Playhead */}
-              {progress > 0 && (
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
-                  style={{
-                    left: `calc(${progress}% - 6px)`,
-                    background: '#A78BFA',
-                    boxShadow: '0 0 8px rgba(167,139,250,0.6)',
-                  }}
-                />
-              )}
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-[9px] font-mono" style={{ color: 'var(--lark-text-muted)' }}>
@@ -199,10 +221,10 @@ export default function PlaybackEngineCard({ outputUrl, isProcessing }) {
             </div>
           </div>
 
-          {/* Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center gap-3 pb-1">
             <button
-              onClick={restart}
+              type="button"
+              onClick={() => seek(0)}
               className="p-1.5 rounded-lg transition-colors"
               style={{ color: 'var(--lark-text-muted)' }}
             >
@@ -210,63 +232,94 @@ export default function PlaybackEngineCard({ outputUrl, isProcessing }) {
             </button>
 
             <button
+              type="button"
               onClick={togglePlay}
-              disabled={!outputUrl}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
+              disabled={!hasAudio || loading}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-40"
               style={{
-                background: outputUrl
-                  ? 'linear-gradient(135deg, #7C3AED, #5B21B6)'
+                background: hasAudio
+                  ? 'linear-gradient(135deg, #38BDF8, #7C3AED)'
                   : 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(139,92,246,0.4)',
-                color: outputUrl ? '#fff' : 'var(--lark-text-subtle)',
-                boxShadow: outputUrl ? '0 0 16px rgba(139,92,246,0.3)' : 'none',
+                border: '1px solid rgba(139,92,246,0.35)',
+                color: hasAudio ? '#fff' : 'var(--lark-text-subtle)',
+                boxShadow: hasAudio ? '0 0 16px rgba(56,189,248,0.25)' : 'none',
               }}
             >
               {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
             </button>
 
-            <div className="flex items-center gap-1.5">
-              <Volume2 size={12} style={{ color: 'var(--lark-text-muted)' }} />
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={volume}
-                onChange={e => {
-                  const v = parseFloat(e.target.value);
-                  setVolume(v);
-                  if (audioRef.current) audioRef.current.volume = v;
-                }}
-                className="w-14 h-1 accent-violet-500 cursor-pointer"
-              />
-            </div>
+            <Volume2 size={12} style={{ color: 'var(--lark-text-muted)' }} />
           </div>
         </div>
 
-        {/* Empty state label */}
-        {!outputUrl && !isProcessing && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <AudioWaveform size={28} className="mx-auto mb-2 opacity-10" style={{ color: '#8B5CF6' }} />
-              <p className="text-[10px] uppercase tracking-widest opacity-20" style={{ color: '#8B5CF6' }}>
-                Awaiting Output
-              </p>
-            </div>
+        {!hasAudio && !loading && !isGenerating && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+            <AudioWaveform size={28} style={{ color: '#38BDF8' }} />
           </div>
         )}
       </div>
 
-      {/* Hidden audio element */}
-      {outputUrl && (
-        <audio
-          ref={audioRef}
-          src={outputUrl}
-          onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
-          onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-          onEnded={() => setIsPlaying(false)}
-          style={{ display: 'none' }}
-        />
+      {dawUrl && (
+        <div className="mt-3 flex flex-col gap-2">
+          {layerCount > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={onImportToStudio}
+                disabled={isImportingWowLayers || isGenerating}
+                className="w-full py-2 rounded-lg flex items-center justify-center gap-1.5 text-[10px] font-semibold transition-all cursor-pointer disabled:opacity-50"
+                style={{
+                  color: '#7DD3FC',
+                  border: '1px solid rgba(56,189,248,0.35)',
+                  background: 'rgba(56,189,248,0.08)',
+                }}
+              >
+                {isImportingWowLayers ? (
+                  <>
+                    <Loader2 size={11} className="animate-spin" />
+                    <span>{wowImportStatus || 'Importing to Studio…'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={11} />
+                    <span>Import {MOOD_LAYERS_NAME} to Audiotool Studio</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadLayers}
+                disabled={isGenerating}
+                className="w-full py-2 rounded-lg flex items-center justify-center gap-1.5 text-[10px] font-semibold transition-all cursor-pointer disabled:opacity-50"
+                style={{
+                  color: 'var(--lark-text-muted)',
+                  border: '1px solid var(--lark-border)',
+                  background: 'rgba(128,128,128,0.06)',
+                }}
+              >
+                Download MP3 layers
+              </button>
+              {downloadMsg && (
+                <p className="text-[9px] text-center leading-snug px-1" style={{ color: '#86efac' }}>
+                  {downloadMsg}
+                </p>
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => openAudiotoolStudio(dawUrl)}
+            className="w-full py-2 rounded-lg flex items-center justify-center gap-1.5 text-[10px] font-semibold transition-all cursor-pointer"
+            style={{
+              color: 'var(--lark-violet-bright)',
+              border: '1px solid rgba(139,92,246,0.25)',
+              background: 'rgba(139,92,246,0.06)',
+            }}
+          >
+            <ExternalLink size={11} />
+            Open MIDI mix in Audiotool Studio
+          </button>
+        </div>
       )}
     </div>
   );

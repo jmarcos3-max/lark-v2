@@ -21,6 +21,33 @@ function deviceOutputLocation(device) {
   return device?.fields?.audioOutput?.location ?? null;
 }
 
+function notesOutputLocation(device) {
+  return device?.fields?.notesOutput?.location ?? null;
+}
+
+function notesInputLocation(device) {
+  return device?.fields?.notesInput?.location ?? null;
+}
+
+/** Cable MIDI out → synth in (e.g. Matrix Arpeggiator → Heisenberg). */
+export function wireNotesOutputToInput(t, fromDevice, toDevice) {
+  const fromSocket = notesOutputLocation(fromDevice);
+  const toSocket = notesInputLocation(toDevice);
+  if (!fromSocket || !toSocket) return false;
+
+  t.create('desktopNoteCable', {
+    fromSocket,
+    toSocket,
+    colorIndex: 0,
+  });
+  return true;
+}
+
+/** Device that carries audio to the mixer (direct or via note-chain voice). */
+export function resolveAudioDevice(device, voiceDevice) {
+  return deviceOutputLocation(device) ? device : voiceDevice;
+}
+
 function locationsEqual(a, b) {
   if (a == null || b == null) return false;
   if (a === b) return true;
@@ -91,19 +118,22 @@ export function ensureMixerMasterInTransaction(t) {
 
 /**
  * Pick a free mixer channel or create one (inside an open modify transaction).
+ * Each device needs its own channel — reusing a cabled channel causes Nexus validation errors.
  * @param {import('@audiotool/nexus').TransactionBuilder} t
+ * @param {{ stripLabel?: string }} [options]
  */
-export function ensureMixerChannelInTransaction(t) {
+export function ensureMixerChannelInTransaction(t, { stripLabel = 'Lark', forceNew = false } = {}) {
   ensureMixerMasterInTransaction(t);
 
-  const channels = t.entities?.ofTypes?.('mixerChannel')?.get?.() ?? [];
-  const free = channels.find((ch) => cablesIntoMixerChannelInTransaction(t, ch).length === 0);
-  if (free) return free;
-  if (channels.length) return channels[channels.length - 1];
+  if (!forceNew) {
+    const channels = t.entities?.ofTypes?.('mixerChannel')?.get?.() ?? [];
+    const free = channels.find((ch) => cablesIntoMixerChannelInTransaction(t, ch).length === 0);
+    if (free) return free;
+  }
 
   return t.create('mixerChannel', {
     displayParameters: {
-      displayName: 'Lark',
+      displayName: stripLabel,
       orderAmongStrips: nextOrderAmongStripsInTransaction(t),
       colorIndex: 6,
     },

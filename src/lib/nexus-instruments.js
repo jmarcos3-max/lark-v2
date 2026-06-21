@@ -1,26 +1,70 @@
 import {
   deviceLabel,
+  NEXUS_DEVICE_BY_INSTRUMENT,
   nexusDeviceCreateOptions,
 } from '@/lib/lark-instruments';
 import {
   ensureMixerChannelInTransaction,
   primeDeviceForPlayback,
+  resolveMixerChannelInput,
   wireDeviceToMixerChannel,
 } from '@/lib/nexus-mixer-routing';
 
 export const LARK_DEVICE_PREFIX = 'Lark · ';
+
+const NEXUS_DEVICE_TYPES = Object.values(NEXUS_DEVICE_BY_INSTRUMENT);
 
 function displayNameOf(entity) {
   const field = entity?.fields?.displayName;
   return field?.value ?? field ?? '';
 }
 
-/** Lark-tagged devices to remove before a new transform (query outside modify). */
+function fieldValue(field) {
+  if (field == null) return undefined;
+  return typeof field === 'object' && 'value' in field ? field.value : field;
+}
+
+function locationsEqual(a, b) {
+  if (a == null || b == null) return false;
+  if (a === b) return true;
+  if (typeof a.equals === 'function') return a.equals(b);
+  return String(a) === String(b);
+}
+
+/** Lark-tagged desktop devices to remove before a new transform. */
 export function findLarkDevices(nexusDoc) {
-  const all = nexusDoc.queryEntities?.get?.() ?? [];
-  return all.filter((entity) => {
-    const name = displayNameOf(entity);
-    return typeof name === 'string' && name.startsWith(LARK_DEVICE_PREFIX);
+  const results = [];
+  for (const deviceType of NEXUS_DEVICE_TYPES) {
+    const devices = nexusDoc.queryEntities?.ofTypes(deviceType)?.get?.() ?? [];
+    for (const device of devices) {
+      const name = displayNameOf(device);
+      if (typeof name === 'string' && name.startsWith(LARK_DEVICE_PREFIX)) {
+        results.push(device);
+      }
+    }
+  }
+  return results;
+}
+
+/** Lark-tagged mixer strips from prior transforms. */
+export function findLarkMixerChannels(nexusDoc) {
+  const channels = nexusDoc.queryEntities?.ofTypes('mixerChannel')?.get?.() ?? [];
+  return channels.filter((channel) => {
+    const stripName = fieldValue(channel.fields?.displayParameters?.displayName);
+    return typeof stripName === 'string' && stripName.startsWith(LARK_DEVICE_PREFIX);
+  });
+}
+
+/** Note tracks still pointing at Lark devices (fallback if device removal missed). */
+export function findLarkNoteTracks(nexusDoc) {
+  const larkDevices = findLarkDevices(nexusDoc);
+  if (!larkDevices.length) return [];
+
+  const devicePlayers = larkDevices.map((device) => device.location);
+  const tracks = nexusDoc.queryEntities?.ofTypes('noteTrack')?.get?.() ?? [];
+  return tracks.filter((track) => {
+    const player = fieldValue(track.fields?.player);
+    return devicePlayers.some((loc) => locationsEqual(player, loc));
   });
 }
 

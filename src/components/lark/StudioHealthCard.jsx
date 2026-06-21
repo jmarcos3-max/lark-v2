@@ -71,7 +71,7 @@ export default function StudioHealthCard({ currentProject, report, projectError 
 
       <p className="text-[10px]" style={{ color: 'var(--lark-text-subtle)' }}>
         {report
-          ? `${report.noteCount} notes at ~${report.bpm} BPM on ${studioDeviceName(report.instrument)}.`
+          ? `${report.leadNoteCount ?? report.noteCount} lead notes${report.layerCount ? ` + ${report.layerCount} layer${report.layerCount > 1 ? 's' : ''}` : ''} at ~${report.bpm} BPM on ${studioDeviceName(report.instrument)}.`
           : 'Run Transform to populate SDK checks.'}
       </p>
       {projectError && (
